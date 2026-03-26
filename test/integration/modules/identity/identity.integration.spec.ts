@@ -11,6 +11,7 @@ import { InvalidateSessionUseCase } from "../../../../src/modules/identity/appli
 import { LoginWithPasswordUseCase } from "../../../../src/modules/identity/application/use-cases/login-with-password.use-case";
 import { IdentityModule } from "../../../../src/modules/identity/identity.module";
 import { UsersModule } from "../../../../src/modules/users/users.module";
+import { SecurityModule } from "../../../../src/shared/security.module";
 import { isDockerAvailable } from "../../../support/docker-availability";
 
 const describeIfDocker = isDockerAvailable() ? describe : describe.skip;
@@ -87,7 +88,14 @@ describeIfDocker("Identity integration", () => {
 
 async function createTestingApplication() {
   const moduleReference = await Test.createTestingModule({
-    imports: [AppConfigModule, LoggingModule, DatabaseModule, UsersModule, IdentityModule],
+    imports: [
+      AppConfigModule,
+      LoggingModule,
+      DatabaseModule,
+      SecurityModule,
+      UsersModule,
+      IdentityModule,
+    ],
   }).compile();
 
   await moduleReference.init();

@@ -22,20 +22,25 @@ import { IdentityModule } from "../../../../src/modules/identity/identity.module
 import { CreateOrganizationUseCase } from "../../../../src/modules/organizations/application/use-cases/create-organization.use-case";
 import { OrganizationsModule } from "../../../../src/modules/organizations/organizations.module";
 import { UsersModule } from "../../../../src/modules/users/users.module";
+import { SecurityModule } from "../../../../src/shared/security.module";
 import { isDockerAvailable } from "../../../support/docker-availability";
 
 const describeIfDocker = isDockerAvailable() ? describe : describe.skip;
+
+jest.setTimeout(120000);
 
 describeIfDocker("Access control integration", () => {
   let container: StartedPostgreSqlContainer;
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer("postgres:16-alpine").start();
-  });
+  }, 120000);
 
   afterAll(async () => {
-    await container.stop();
-  });
+    if (container !== undefined) {
+      await container.stop();
+    }
+  }, 120000);
 
   it("backfills organization_admin and tenant-local permissions for existing memberships", async () => {
     configureDatabaseEnvironment(container);
@@ -182,6 +187,7 @@ async function createTestingApplication() {
       AppConfigModule,
       LoggingModule,
       DatabaseModule,
+      SecurityModule,
       UsersModule,
       AccessControlModule,
       OrganizationsModule,

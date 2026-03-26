@@ -12,6 +12,7 @@ import { IdentityModule } from "../../../../src/modules/identity/identity.module
 import { CreateOrganizationUseCase } from "../../../../src/modules/organizations/application/use-cases/create-organization.use-case";
 import { OrganizationsModule } from "../../../../src/modules/organizations/organizations.module";
 import { UsersModule } from "../../../../src/modules/users/users.module";
+import { SecurityModule } from "../../../../src/shared/security.module";
 import { isDockerAvailable } from "../../../support/docker-availability";
 
 const describeIfDocker = isDockerAvailable() ? describe : describe.skip;
@@ -106,6 +107,7 @@ async function createTestingApplication() {
       AppConfigModule,
       LoggingModule,
       DatabaseModule,
+      SecurityModule,
       UsersModule,
       OrganizationsModule,
       IdentityModule,
