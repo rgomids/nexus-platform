@@ -1,11 +1,11 @@
 import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
 
 import type { RequestWithSecurityContext } from "../auth/request-context.types";
-import { TenantContextDeniedError, TenantContextRequiredError } from "./tenant.errors";
+import { TenantContextDeniedError } from "./tenant.errors";
 import { TenantContextResolverService } from "./tenant-context-resolver.service";
 
 @Injectable()
-export class TenantContextGuard implements CanActivate {
+export class ActiveTenantGuard implements CanActivate {
   public constructor(
     private readonly tenantContextResolverService: TenantContextResolverService,
   ) {}
@@ -20,20 +20,9 @@ export class TenantContextGuard implements CanActivate {
 
     request.tenantContext = await this.tenantContextResolverService.resolve({
       organizationId: principal.organizationId,
-      routeOrganizationId: this.readRouteOrganizationId(request),
       userId: principal.userId,
     });
 
     return true;
-  }
-
-  private readRouteOrganizationId(request: RequestWithSecurityContext): string {
-    const organizationId = request.params.id;
-
-    if (typeof organizationId !== "string" || organizationId.length === 0) {
-      throw new TenantContextRequiredError();
-    }
-
-    return organizationId;
   }
 }

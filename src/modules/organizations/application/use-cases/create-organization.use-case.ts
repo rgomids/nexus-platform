@@ -5,6 +5,10 @@ import { PinoLogger } from "nestjs-pino";
 
 import { DatabaseExecutor } from "../../../../bootstrap/persistence/database.executor";
 import {
+  ACCESS_CONTROL_BOOTSTRAP_CONTRACT,
+  type AccessControlBootstrapContract,
+} from "../../../access-control/application/contracts/access-control-bootstrap.contract";
+import {
   USERS_TENANCY_CONTRACT,
   type UsersTenancyContract,
 } from "../../../users/application/contracts/users-tenancy.contract";
@@ -34,6 +38,8 @@ export class CreateOrganizationUseCase {
     private readonly organizationRepository: OrganizationRepository,
     @Inject(USERS_TENANCY_CONTRACT)
     private readonly usersTenancyContract: UsersTenancyContract,
+    @Inject(ACCESS_CONTROL_BOOTSTRAP_CONTRACT)
+    private readonly accessControlBootstrapContract: AccessControlBootstrapContract,
     private readonly databaseExecutor: DatabaseExecutor,
     private readonly logger: PinoLogger,
   ) {
@@ -53,6 +59,10 @@ export class CreateOrganizationUseCase {
       await this.usersTenancyContract.createMembership({
         organizationId: organization.id,
         userId: input.createdByUserId,
+      });
+      await this.accessControlBootstrapContract.bootstrapTenantAccessControl({
+        createdByUserId: input.createdByUserId,
+        organizationId: organization.id,
       });
     });
 

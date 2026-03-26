@@ -1,10 +1,10 @@
 # Nexus Platform
 
-Multi-tenant backend platform for identity, organizations, users, access control and immutable auditability. The codebase is intentionally evolving as a modular monolith with DDD, Clean Architecture and explicit internal boundaries.
+Multi-tenant backend platform for identity, organizations, users, tenant-scoped RBAC and future immutable auditability. The codebase remains a modular monolith with DDD, Clean Architecture and explicit internal boundaries.
 
 ## 🚧 Project Status
 
-Current Phase: **Phase 2 — Multi-Tenancy**
+Current Phase: **Phase 3 — RBAC**
 
 Notion reference: [Nexus Platform](https://www.notion.so/mrgomides/Nexus-Platform-32fe01f2262680cd9e32db2b5cdd8f7b?source=copy_link)
 
@@ -22,15 +22,15 @@ Notion reference: [Nexus Platform](https://www.notion.so/mrgomides/Nexus-Platfor
 - Docker
 - GitHub Actions
 
-## What Phase 2 Delivers
+## What Phase 3 Delivers
 
-- `organizations` module with tenant lifecycle (`active|inactive`)
-- `users` ownership for `memberships` between users and organizations
-- tenant-bound login with controlled bootstrap sessions for users without memberships
-- protected tenant context resolution with explicit deny-by-default guards
-- SQL migrations for `organizations`, `memberships` and `sessions.organization_id`
-- structured logs for organization, membership and tenant-context events
-- unit, integration and functional coverage for the multi-tenant base
+- tenant-scoped `roles`, `permissions`, `role_permissions` and `user_role_assignments`
+- explicit authorization policy with deny-by-default decisions
+- protected HTTP endpoints using `AuthenticatedRequestGuard -> tenant guard -> authorization guard`
+- session-scoped RBAC management endpoints for role creation, permission grants and user-role assignment
+- SQL migration that backfills `organization_admin` plus the default permission catalog for existing tenants
+- structured logs for `role_created`, `permission_granted`, `role_assigned`, `authorization_allowed` and `authorization_denied`
+- unit, integration and functional coverage for RBAC behavior
 
 ## Available Endpoints
 
@@ -43,30 +43,59 @@ Notion reference: [Nexus Platform](https://www.notion.so/mrgomides/Nexus-Platfor
 - `PATCH /organizations/:id/inactive`
 - `POST /organizations/:id/memberships`
 - `GET /organizations/:id/memberships`
+- `POST /roles`
+- `GET /roles`
+- `POST /roles/:id/permissions`
+- `GET /permissions`
+- `POST /users/:id/roles`
 
-## Tenant Context Flow
+## Authorization Model
 
 ```text
-Bootstrap path
-  -> create account
-  -> login without organizationId when user has zero active memberships
-  -> create organization
-  -> creator receives first active membership
-
-Tenant-bound path
-  -> login with email, password and organizationId
-  -> validate active organization
-  -> validate active membership for user + organization
-  -> create persisted session bound to organization_id
-  -> resolve tenant context on protected routes
-  -> deny requests with missing, inactive or mismatched tenant context
+Authenticated User
+  -> tenant context resolved from the active session
+  -> active organization validation
+  -> active membership validation
+  -> roles assigned inside the tenant
+  -> permissions resolved from those roles
+  -> allow / deny
 ```
 
-## Core Entities Added In Phase 2
+### Default bootstrap and backfill
 
-- `Organization`
-- `Membership`
-- `Session.organizationId`
+- Every tenant receives a default `organization_admin` role.
+- The role is granted the full default permission catalog for this phase.
+- Existing active memberships were backfilled with `organization_admin` in the Phase 3 migration.
+- New organizations bootstrap the creator membership and the `organization_admin` assignment in the same transaction flow.
+
+### Default permission catalog
+
+- `organization:view`
+- `organization:deactivate`
+- `membership:create`
+- `membership:view`
+- `role:create`
+- `role:view`
+- `permission:view`
+- `role:grant-permission`
+- `role:assign`
+- `user:create`
+- `user:update`
+- `audit:view`
+
+## Tenant and Authorization Notes
+
+- `POST /identity/login` still accepts `organizationId` for tenant-bound sessions.
+- Users with active memberships must log in with `organizationId`.
+- Users without active memberships can still obtain a bootstrap session with `organizationId = null`.
+- `POST /organizations` remains authentication-only because it happens before tenant RBAC exists.
+- Tenant-scoped organization routes require:
+  - authenticated principal
+  - tenant context resolved from the active session
+  - active organization
+  - active membership
+  - matching RBAC permission for the requested action
+- Session-scoped RBAC routes (`/roles`, `/permissions`, `/users/:id/roles`) resolve the tenant directly from the active session and still validate organization + membership before authorization.
 
 ## Project Structure
 
@@ -93,6 +122,9 @@ src/
       domain/
       infrastructure/
     access-control/
+      application/
+      domain/
+      infrastructure/
     audit-logs/
   shared/
     auth/
@@ -155,26 +187,15 @@ npm run test:functional
 
 `integration` and `functional` suites use Testcontainers and require a running Docker daemon. When Docker is unavailable, those suites are skipped locally; CI runs them with Docker enabled.
 
-## Authentication And Tenant Notes
-
-- `POST /identity/login` accepts `organizationId` for tenant-bound sessions.
-- If a user has at least one active membership, `organizationId` is mandatory at login.
-- If a user has zero active memberships, login can create a bootstrap session with `organizationId = null`.
-- Bootstrap sessions can authenticate `POST /organizations`, but tenant-scoped routes require a resolved tenant context.
-- Protected tenant-scoped routes validate:
-  - authenticated principal
-  - `organizationId` bound to the session
-  - active organization
-  - active membership for the authenticated user
-
 ## Architecture Notes
 
 - Modular Monolith remains the deployment model.
-- `users` owns the global user record and all `memberships`.
-- `organizations` owns tenant lifecycle and coordinates organization-scoped flows.
-- `identity` owns `accounts`, `credentials` and `sessions`, but consumes tenant contracts from `organizations` and `users`.
+- `identity` owns authentication, sessions and the authenticated principal.
+- `organizations` owns tenant lifecycle and tenant-scoped membership flows.
+- `users` owns the global user record and `memberships`.
+- `access-control` owns roles, permissions, user-role assignments and the final authorization decision.
 - PostgreSQL access stays explicit through repositories and SQL, without ORM.
-- RBAC and full auditability remain next-phase constraints.
+- Full append-only audit logs remain the next major phase.
 
 ## Documentation
 
