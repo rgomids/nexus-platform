@@ -1,5 +1,6 @@
 import { forwardRef, Module } from "@nestjs/common";
 
+import { SharedEventsModule } from "../../shared/events/shared-events.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { UsersModule } from "../users/users.module";
 import { ACCESS_TOKEN_SERVICE } from "./application/ports/access-token.service";
@@ -21,7 +22,7 @@ import { JwtAccessTokenService } from "./infrastructure/security/jwt-access-toke
 
 @Module({
   controllers: [IdentityController],
-  imports: [UsersModule, forwardRef(() => OrganizationsModule)],
+  imports: [SharedEventsModule, UsersModule, forwardRef(() => OrganizationsModule)],
   providers: [
     CredentialPolicyService,
     CreateUserAccountUseCase,

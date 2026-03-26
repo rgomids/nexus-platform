@@ -3,6 +3,7 @@ import type { PinoLogger } from "nestjs-pino";
 import type { DatabaseExecutor } from "../../../../../src/bootstrap/persistence/database.executor";
 import { CreateOrganizationUseCase } from "../../../../../src/modules/organizations/application/use-cases/create-organization.use-case";
 import { Organization } from "../../../../../src/modules/organizations/domain/entities/organization.entity";
+import { createInternalEventBusMock } from "../../../../support/unit-test-doubles";
 
 function createLoggerMock(): PinoLogger {
   return {
@@ -36,6 +37,7 @@ describe("CreateOrganizationUseCase", () => {
       usersTenancyContract as never,
       accessControlBootstrapContract as never,
       databaseExecutor,
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -47,6 +49,7 @@ describe("CreateOrganizationUseCase", () => {
     expect(databaseExecutor.withTransaction).toHaveBeenCalledTimes(1);
     expect(organizationRepository.save).toHaveBeenCalledWith(expect.any(Organization));
     expect(usersTenancyContract.createMembership).toHaveBeenCalledWith({
+      actorUserId: "user-1",
       organizationId: result.organizationId,
       userId: "user-1",
     });

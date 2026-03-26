@@ -7,6 +7,10 @@ import {
 } from "../../../../../src/modules/access-control/domain/access-control.errors";
 import { Role } from "../../../../../src/modules/access-control/domain/entities/role.entity";
 import { MembershipNotFoundError, UserNotFoundError } from "../../../../../src/modules/users/domain/user.errors";
+import {
+  createDatabaseExecutorMock,
+  createInternalEventBusMock,
+} from "../../../../support/unit-test-doubles";
 
 function createLoggerMock(): PinoLogger {
   return {
@@ -46,6 +50,8 @@ describe("AssignRoleToUserUseCase", () => {
       {
         save: jest.fn().mockResolvedValue(undefined),
       } as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -68,6 +74,8 @@ describe("AssignRoleToUserUseCase", () => {
       {} as never,
       {} as never,
       {} as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -95,6 +103,8 @@ describe("AssignRoleToUserUseCase", () => {
       } as never,
       {} as never,
       {} as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -129,6 +139,8 @@ describe("AssignRoleToUserUseCase", () => {
         findById: jest.fn().mockResolvedValue(null),
       } as never,
       {} as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -172,6 +184,8 @@ describe("AssignRoleToUserUseCase", () => {
       {
         save: jest.fn().mockRejectedValue(new UserRoleAssignmentAlreadyExistsError()),
       } as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 

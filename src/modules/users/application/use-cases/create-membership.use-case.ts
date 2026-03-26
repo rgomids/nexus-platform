@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { PinoLogger } from "nestjs-pino";
 
+import { DatabaseExecutor } from "../../../../bootstrap/persistence/database.executor";
+import { InternalEventBus } from "../../../../shared/events/internal-event-bus";
 import { Membership } from "../../domain/entities/membership.entity";
 import {
   MEMBERSHIP_REPOSITORY,
@@ -24,6 +26,8 @@ export class CreateMembershipUseCase {
     @Inject(USER_REPOSITORY) private readonly userRepository: UserRepository,
     @Inject(MEMBERSHIP_REPOSITORY)
     private readonly membershipRepository: MembershipRepository,
+    private readonly databaseExecutor: DatabaseExecutor,
+    private readonly internalEventBus: InternalEventBus,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(CreateMembershipUseCase.name);
@@ -52,7 +56,18 @@ export class CreateMembershipUseCase {
       userId: input.userId,
     });
 
-    await this.membershipRepository.save(membership);
+    await this.databaseExecutor.withTransaction(async () => {
+      await this.membershipRepository.save(membership);
+      await this.internalEventBus.publish({
+        actorUserId: input.actorUserId,
+        membershipId: membership.id,
+        occurredAt: membership.createdAt,
+        organizationId: membership.organizationId,
+        type: "membership.assigned",
+        userId: membership.userId,
+      });
+    });
+
     this.logger.info(
       {
         event: "membership_created",

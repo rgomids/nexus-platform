@@ -24,6 +24,7 @@ export class CreateOrganizationMembershipUseCase {
   ) {}
 
   public async execute(input: {
+    readonly actorUserId: string;
     readonly organizationId: string;
     readonly userId: string;
   }): Promise<MembershipSnapshot> {
@@ -38,6 +39,7 @@ export class CreateOrganizationMembershipUseCase {
     }
 
     return this.usersTenancyContract.createMembership({
+      actorUserId: input.actorUserId,
       organizationId: input.organizationId,
       userId: input.userId,
     });

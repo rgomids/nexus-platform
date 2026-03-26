@@ -3,6 +3,10 @@ import type { PinoLogger } from "nestjs-pino";
 import { InvalidateSessionUseCase } from "../../../../../src/modules/identity/application/use-cases/invalidate-session.use-case";
 import { Session } from "../../../../../src/modules/identity/domain/entities/session.entity";
 import { InvalidAccessTokenError } from "../../../../../src/modules/identity/domain/identity.errors";
+import {
+  createDatabaseExecutorMock,
+  createInternalEventBusMock,
+} from "../../../../support/unit-test-doubles";
 
 function createLoggerMock(): PinoLogger {
   return {
@@ -38,6 +42,8 @@ describe("InvalidateSessionUseCase", () => {
           sub: "user-1",
         }),
       } as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -73,6 +79,8 @@ describe("InvalidateSessionUseCase", () => {
           sub: "user-1",
         }),
       } as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 

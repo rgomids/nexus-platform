@@ -18,7 +18,7 @@ docker compose down -v
 docker compose logs -f app postgres
 ```
 
-## Phase 3 API Smoke
+## Phase 4 API Smoke
 
 ```bash
 curl -X POST http://localhost:3000/identity/accounts \
@@ -59,5 +59,11 @@ curl -X POST http://localhost:3000/users/<member-user-id>/roles \
   -d '{"roleId":"<role-id>"}'
 
 curl http://localhost:3000/organizations/<organization-id>/memberships \
+  -H "Authorization: Bearer <tenant-token>"
+
+curl "http://localhost:3000/audit-logs?tenantId=<organization-id>" \
+  -H "Authorization: Bearer <tenant-token>"
+
+curl "http://localhost:3000/audit-logs?tenantId=<organization-id>&action=authorization_denied" \
   -H "Authorization: Bearer <tenant-token>"
 ```

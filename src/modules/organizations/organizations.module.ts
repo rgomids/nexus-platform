@@ -1,5 +1,6 @@
 import { forwardRef, Module } from "@nestjs/common";
 
+import { SharedEventsModule } from "../../shared/events/shared-events.module";
 import { AccessControlModule } from "../access-control/access-control.module";
 import { IdentityModule } from "../identity/identity.module";
 import { UsersModule } from "../users/users.module";
@@ -41,7 +42,12 @@ class OrganizationsTenancyContractAdapter implements OrganizationsTenancyContrac
 
 @Module({
   controllers: [OrganizationsController],
-  imports: [UsersModule, forwardRef(() => AccessControlModule), forwardRef(() => IdentityModule)],
+  imports: [
+    SharedEventsModule,
+    UsersModule,
+    forwardRef(() => AccessControlModule),
+    forwardRef(() => IdentityModule),
+  ],
   providers: [
     CreateOrganizationUseCase,
     GetOrganizationByIdUseCase,

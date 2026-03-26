@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { PinoLogger } from "nestjs-pino";
 
+import { DatabaseExecutor } from "../../../../bootstrap/persistence/database.executor";
+import { InternalEventBus } from "../../../../shared/events/internal-event-bus";
 import {
   USERS_IDENTITY_CONTRACT,
   type UsersIdentityContract,
@@ -42,6 +44,8 @@ export class AssignRoleToUserUseCase {
     private readonly roleRepository: RoleRepository,
     @Inject(USER_ROLE_ASSIGNMENT_REPOSITORY)
     private readonly userRoleAssignmentRepository: UserRoleAssignmentRepository,
+    private readonly databaseExecutor: DatabaseExecutor,
+    private readonly internalEventBus: InternalEventBus,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(AssignRoleToUserUseCase.name);
@@ -77,7 +81,18 @@ export class AssignRoleToUserUseCase {
       userId: input.userId,
     });
 
-    await this.userRoleAssignmentRepository.save(assignment);
+    await this.databaseExecutor.withTransaction(async () => {
+      await this.userRoleAssignmentRepository.save(assignment);
+      await this.internalEventBus.publish({
+        actorUserId: input.actorUserId,
+        occurredAt: assignment.createdAt,
+        organizationId: assignment.organizationId,
+        roleId: role.id,
+        targetUserId: input.userId,
+        type: "access_control.role_assigned",
+      });
+    });
+
     this.logger.info(
       {
         event: "role_assigned",

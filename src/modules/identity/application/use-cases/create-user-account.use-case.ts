@@ -4,6 +4,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { PinoLogger } from "nestjs-pino";
 
 import { DatabaseExecutor } from "../../../../bootstrap/persistence/database.executor";
+import { InternalEventBus } from "../../../../shared/events/internal-event-bus";
 import {
   USERS_IDENTITY_CONTRACT,
   type UsersIdentityContract,
@@ -43,6 +44,7 @@ export class CreateUserAccountUseCase {
     private readonly usersIdentityContract: UsersIdentityContract,
     private readonly credentialPolicy: CredentialPolicyService,
     private readonly databaseExecutor: DatabaseExecutor,
+    private readonly internalEventBus: InternalEventBus,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(CreateUserAccountUseCase.name);
@@ -85,6 +87,14 @@ export class CreateUserAccountUseCase {
 
       await this.accountRepository.save(account);
       await this.credentialRepository.save(credential);
+      await this.internalEventBus.publish({
+        accountId,
+        actorUserId: userId,
+        email: email.normalized,
+        occurredAt: now,
+        type: "user.created",
+        userId,
+      });
     });
 
     this.logger.info(

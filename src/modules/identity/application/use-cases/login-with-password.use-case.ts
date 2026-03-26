@@ -4,6 +4,10 @@ import { Inject, Injectable } from "@nestjs/common";
 import { PinoLogger } from "nestjs-pino";
 
 import { ApplicationConfigService } from "../../../../bootstrap/config/application-config.service";
+import { DatabaseExecutor } from "../../../../bootstrap/persistence/database.executor";
+import type { NexusError } from "../../../../shared/domain/nexus.errors";
+import { InternalEventBus } from "../../../../shared/events/internal-event-bus";
+import { TenantContextRequiredError } from "../../../../shared/tenancy/tenant.errors";
 import {
   ORGANIZATIONS_TENANCY_CONTRACT,
   type OrganizationsTenancyContract,
@@ -33,7 +37,6 @@ import { EmailAddress } from "../../domain/value-objects/email-address.value-obj
 import type { AuthenticatedPrincipalDto } from "../dto/authenticated-principal.dto";
 import { ACCESS_TOKEN_SERVICE, type AccessTokenService } from "../ports/access-token.service";
 import { PASSWORD_HASHER, type PasswordHasher } from "../ports/password-hasher.port";
-import { TenantContextRequiredError } from "../../../../shared/tenancy/tenant.errors";
 
 export interface LoginWithPasswordInput {
   readonly email: string;
@@ -63,6 +66,8 @@ export class LoginWithPasswordUseCase {
     @Inject(ORGANIZATIONS_TENANCY_CONTRACT)
     private readonly organizationsTenancyContract: OrganizationsTenancyContract,
     private readonly configuration: ApplicationConfigService,
+    private readonly databaseExecutor: DatabaseExecutor,
+    private readonly internalEventBus: InternalEventBus,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(LoginWithPasswordUseCase.name);
@@ -70,81 +75,106 @@ export class LoginWithPasswordUseCase {
 
   public async execute(input: LoginWithPasswordInput): Promise<LoginWithPasswordResult> {
     const email = EmailAddress.create(input.email);
-    const account = await this.accountRepository.findByEmail(email);
+    let failedUserId: string | null = null;
 
-    if (account === null || account.status !== "active") {
-      return this.failAuthentication();
-    }
+    try {
+      const account = await this.accountRepository.findByEmail(email);
 
-    const user = await this.usersIdentityContract.getUserById(account.userId);
-    const credential = await this.credentialRepository.findByAccountId(account.id);
+      if (account === null || account.status !== "active") {
+        throw new InvalidCredentialsError();
+      }
 
-    if (user === null || user.status !== "active" || credential === null) {
-      return this.failAuthentication();
-    }
+      const user = await this.usersIdentityContract.getUserById(account.userId);
+      const credential = await this.credentialRepository.findByAccountId(account.id);
 
-    const passwordMatches = await this.passwordHasher.verify(credential.passwordHash, input.password);
+      if (user === null || user.status !== "active" || credential === null) {
+        throw new InvalidCredentialsError();
+      }
 
-    if (!passwordMatches) {
-      return this.failAuthentication();
-    }
+      failedUserId = user.userId;
 
-    const organizationId = await this.resolveOrganizationContext(user.userId, input.organizationId);
-    const now = new Date();
-    const expiresAt = new Date(
-      now.getTime() + 1000 * 60 * this.configuration.auth.jwtExpiresInMinutes,
-    );
-    const session = Session.start({
-      accountId: account.id,
-      expiresAt,
-      id: randomUUID(),
-      jti: randomUUID(),
-      now,
-      organizationId,
-      userId: user.userId,
-    });
+      const passwordMatches = await this.passwordHasher.verify(
+        credential.passwordHash,
+        input.password,
+      );
 
-    await this.sessionRepository.save(session);
+      if (!passwordMatches) {
+        throw new InvalidCredentialsError();
+      }
 
-    const accessToken = await this.accessTokenService.issue(
-      {
-        aid: account.id,
-        jti: session.jti,
-        oid: organizationId,
-        sid: session.id,
-        sub: user.userId,
-      },
-      expiresAt,
-    );
-
-    this.logger.info(
-      {
+      const organizationId = await this.resolveOrganizationContext(user.userId, input.organizationId);
+      const now = new Date();
+      const expiresAt = new Date(
+        now.getTime() + 1000 * 60 * this.configuration.auth.jwtExpiresInMinutes,
+      );
+      const session = Session.start({
         accountId: account.id,
-        event: "login_succeeded",
-        sessionId: session.id,
-        userId: user.userId,
-      },
-      "Identity login succeeded",
-    );
-
-    return {
-      accessToken,
-      principal: {
-        accountId: account.id,
-        accountStatus: account.status,
-        email: account.email.normalized,
+        expiresAt,
+        id: randomUUID(),
+        jti: randomUUID(),
+        now,
         organizationId,
         userId: user.userId,
-        userStatus: user.status,
-      },
-      sessionId: session.id,
-      tokenType: "Bearer",
-    };
-  }
+      });
 
-  private failAuthentication(): never {
-    this.logger.warn({ event: "login_failed" }, "Identity login failed");
-    throw new InvalidCredentialsError();
+      await this.databaseExecutor.withTransaction(async () => {
+        await this.sessionRepository.save(session);
+        await this.internalEventBus.publish({
+          accountId: account.id,
+          occurredAt: now,
+          organizationId,
+          sessionId: session.id,
+          type: "identity.login_succeeded",
+          userId: user.userId,
+        });
+      });
+
+      const accessToken = await this.accessTokenService.issue(
+        {
+          aid: account.id,
+          jti: session.jti,
+          oid: organizationId,
+          sid: session.id,
+          sub: user.userId,
+        },
+        expiresAt,
+      );
+
+      this.logger.info(
+        {
+          accountId: account.id,
+          event: "login_succeeded",
+          sessionId: session.id,
+          userId: user.userId,
+        },
+        "Identity login succeeded",
+      );
+
+      return {
+        accessToken,
+        principal: {
+          accountId: account.id,
+          accountStatus: account.status,
+          email: account.email.normalized,
+          organizationId,
+          userId: user.userId,
+          userStatus: user.status,
+        },
+        sessionId: session.id,
+        tokenType: "Bearer",
+      };
+    } catch (error) {
+      if (this.isAuditableLoginFailure(error)) {
+        await this.publishLoginFailureAudit({
+          email: email.normalized,
+          organizationId: input.organizationId ?? null,
+          reason: this.readErrorCode(error),
+          userId: failedUserId,
+        });
+      }
+
+      throw error;
+    }
   }
 
   private async resolveOrganizationContext(
@@ -182,5 +212,68 @@ export class LoginWithPasswordUseCase {
     }
 
     return organizationId;
+  }
+
+  private isAuditableLoginFailure(error: unknown): boolean {
+    return (
+      error instanceof InvalidCredentialsError ||
+      error instanceof MembershipNotFoundError ||
+      error instanceof OrganizationInactiveError ||
+      error instanceof OrganizationNotFoundError ||
+      error instanceof TenantContextRequiredError
+    );
+  }
+
+  private async publishLoginFailureAudit(input: {
+    readonly email: string;
+    readonly organizationId: string | null;
+    readonly reason: string;
+    readonly userId: string | null;
+  }): Promise<void> {
+    this.logger.warn(
+      {
+        event: "login_failed",
+        organizationId: input.organizationId,
+        reason: input.reason,
+        userId: input.userId,
+      },
+      "Identity login failed",
+    );
+
+    try {
+      await this.internalEventBus.publish({
+        email: input.email,
+        occurredAt: new Date(),
+        organizationId: input.organizationId,
+        reason: input.reason,
+        type: "identity.login_failed",
+        userId: input.userId,
+      });
+    } catch (auditError) {
+      this.logger.error(
+        {
+          err: auditError,
+          event: "error",
+          failedAuditEvent: "login_failed",
+          organizationId: input.organizationId,
+          reason: input.reason,
+          userId: input.userId,
+        },
+        "Failed to append audit log for login failure",
+      );
+    }
+  }
+
+  private readErrorCode(error: unknown): string {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      typeof (error as NexusError).code === "string"
+    ) {
+      return (error as NexusError).code;
+    }
+
+    return "unknown_error";
   }
 }

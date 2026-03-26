@@ -1,5 +1,6 @@
 import { forwardRef, Module } from "@nestjs/common";
 
+import { SharedEventsModule } from "../../shared/events/shared-events.module";
 import { IdentityModule } from "../identity/identity.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { UsersModule } from "../users/users.module";
@@ -39,6 +40,7 @@ import { TenantContextResolverService } from "../../shared/tenancy/tenant-contex
 @Module({
   controllers: [AccessControlController],
   imports: [
+    SharedEventsModule,
     UsersModule,
     forwardRef(() => IdentityModule),
     forwardRef(() => OrganizationsModule),

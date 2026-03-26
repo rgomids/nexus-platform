@@ -55,8 +55,14 @@ export class OrganizationsController {
   @Patch(":id/inactive")
   @UseGuards(AuthenticatedRequestGuard, TenantContextGuard, AuthorizationGuard)
   @RequirePermission("organization:deactivate")
-  public deactivateOrganization(@Param() params: OrganizationIdParamsDto) {
-    return this.deactivateOrganizationUseCase.execute(params.id);
+  public deactivateOrganization(
+    @Param() params: OrganizationIdParamsDto,
+    @AuthenticatedPrincipal() principal: AuthenticatedPrincipalDto,
+  ) {
+    return this.deactivateOrganizationUseCase.execute({
+      actorUserId: principal.userId,
+      organizationId: params.id,
+    });
   }
 
   @Post(":id/memberships")
@@ -65,8 +71,10 @@ export class OrganizationsController {
   public createMembership(
     @Param() params: OrganizationIdParamsDto,
     @Body() body: CreateOrganizationMembershipRequestDto,
+    @AuthenticatedPrincipal() principal: AuthenticatedPrincipalDto,
   ) {
     return this.createOrganizationMembershipUseCase.execute({
+      actorUserId: principal.userId,
       organizationId: params.id,
       userId: body.userId,
     });

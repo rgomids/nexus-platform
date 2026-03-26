@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { SharedEventsModule } from "../../shared/events/shared-events.module";
 import {
   USERS_IDENTITY_CONTRACT,
   type UsersIdentityContract,
@@ -60,6 +61,7 @@ class UsersTenancyContractAdapter implements UsersTenancyContract {
 }
 
 @Module({
+  imports: [SharedEventsModule],
   providers: [
     CreateUserUseCase,
     GetUserByIdUseCase,

@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { PinoLogger } from "nestjs-pino";
 
+import { DatabaseExecutor } from "../../../../bootstrap/persistence/database.executor";
+import { InternalEventBus } from "../../../../shared/events/internal-event-bus";
 import { PermissionNotFoundError, RoleNotFoundError } from "../../domain/access-control.errors";
 import { RolePermission } from "../../domain/entities/role-permission.entity";
 import {
@@ -35,6 +37,8 @@ export class GrantPermissionToRoleUseCase {
     private readonly permissionRepository: PermissionRepository,
     @Inject(ROLE_PERMISSION_REPOSITORY)
     private readonly rolePermissionRepository: RolePermissionRepository,
+    private readonly databaseExecutor: DatabaseExecutor,
+    private readonly internalEventBus: InternalEventBus,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(GrantPermissionToRoleUseCase.name);
@@ -64,7 +68,19 @@ export class GrantPermissionToRoleUseCase {
       roleId: role.id,
     });
 
-    await this.rolePermissionRepository.save(rolePermission);
+    await this.databaseExecutor.withTransaction(async () => {
+      await this.rolePermissionRepository.save(rolePermission);
+      await this.internalEventBus.publish({
+        actorUserId: input.actorUserId,
+        occurredAt: rolePermission.createdAt,
+        organizationId: input.organizationId,
+        permissionCode: permission.code,
+        permissionId: permission.id,
+        roleId: role.id,
+        type: "access_control.permission_granted",
+      });
+    });
+
     this.logger.info(
       {
         event: "permission_granted",

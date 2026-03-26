@@ -1,5 +1,6 @@
 import { Global, Module } from "@nestjs/common";
 
+import { SharedEventsModule } from "./events/shared-events.module";
 import { AccessControlModule } from "../modules/access-control/access-control.module";
 import { IdentityModule } from "../modules/identity/identity.module";
 import { OrganizationsModule } from "../modules/organizations/organizations.module";
@@ -12,7 +13,13 @@ import { TenantContextResolverService } from "./tenancy/tenant-context-resolver.
 
 @Global()
 @Module({
-  imports: [IdentityModule, OrganizationsModule, UsersModule, AccessControlModule],
+  imports: [
+    SharedEventsModule,
+    IdentityModule,
+    OrganizationsModule,
+    UsersModule,
+    AccessControlModule,
+  ],
   providers: [
     TenantContextResolverService,
     AuthenticatedRequestGuard,

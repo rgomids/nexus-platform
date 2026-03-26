@@ -8,6 +8,10 @@ import {
 } from "../../../../../src/modules/access-control/domain/access-control.errors";
 import { Permission } from "../../../../../src/modules/access-control/domain/entities/permission.entity";
 import { Role } from "../../../../../src/modules/access-control/domain/entities/role.entity";
+import {
+  createDatabaseExecutorMock,
+  createInternalEventBusMock,
+} from "../../../../support/unit-test-doubles";
 
 function createLoggerMock(): PinoLogger {
   return {
@@ -43,6 +47,8 @@ describe("GrantPermissionToRoleUseCase", () => {
       {
         save: jest.fn().mockResolvedValue(undefined),
       } as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -64,6 +70,8 @@ describe("GrantPermissionToRoleUseCase", () => {
       } as never,
       {} as never,
       {} as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -93,6 +101,8 @@ describe("GrantPermissionToRoleUseCase", () => {
         findByCode: jest.fn().mockResolvedValue(null),
       } as never,
       {} as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -132,6 +142,8 @@ describe("GrantPermissionToRoleUseCase", () => {
       {
         save: jest.fn().mockRejectedValue(new RolePermissionAlreadyExistsError()),
       } as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 

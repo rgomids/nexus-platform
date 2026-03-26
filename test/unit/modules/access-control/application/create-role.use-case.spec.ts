@@ -3,6 +3,10 @@ import type { PinoLogger } from "nestjs-pino";
 import { CreateRoleUseCase } from "../../../../../src/modules/access-control/application/use-cases/create-role.use-case";
 import { RoleAlreadyExistsError } from "../../../../../src/modules/access-control/domain/access-control.errors";
 import { Role } from "../../../../../src/modules/access-control/domain/entities/role.entity";
+import {
+  createDatabaseExecutorMock,
+  createInternalEventBusMock,
+} from "../../../../support/unit-test-doubles";
 
 function createLoggerMock(): PinoLogger {
   return {
@@ -18,6 +22,8 @@ describe("CreateRoleUseCase", () => {
     };
     const useCase = new CreateRoleUseCase(
       roleRepository as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -37,6 +43,8 @@ describe("CreateRoleUseCase", () => {
       {
         save: jest.fn().mockRejectedValue(new RoleAlreadyExistsError()),
       } as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
