@@ -1,6 +1,17 @@
 # Changelog
 
 ## [2026-03-26]
+- fix: `AccessControlModule` agora importa `IdentityModule` via `forwardRef`, corrigindo o ciclo `Identity -> Organizations -> AccessControl -> Identity` que ainda quebrava a CI de integração.
+- fix: `AccessControlModule` passou a prover localmente os guards e o resolvedor de tenant para evitar falha de DI dos endpoints RBAC durante os testes de integração.
+- fix: workflow de CI agora faz `docker compose down` apenas quando o arquivo `.env` foi preparado, evitando falha secundária no teardown.
+- feature: implementação da Phase 3 — RBAC com módulo `access-control`, catálogo de permissões tenant-local, roles, grants e user-role assignments.
+- feature: guards de tenant ativo e autorização deny-by-default aplicados aos endpoints RBAC e às rotas sensíveis de `organizations`.
+- feature: migration `0003_access_control_rbac.sql` com backfill de `organization_admin` para memberships ativas existentes.
+- fix: imagem Docker de produção agora inclui as migrations SQL exigidas no bootstrap da aplicação.
+- test: cobertura unitária do domínio e dos casos de uso RBAC, além de suites de integração e functional ampliadas para autorização.
+- docs: README, arquitetura, comandos, status de fase, handoff e ADR 0006 atualizados para o rollout RBAC.
+
+## [2026-03-26]
 - feature: implementação da Phase 2 — Multi-Tenancy com módulo `organizations`, `memberships` no módulo `users` e sessões autenticadas vinculadas a tenant.
 - feature: guards de principal autenticado e tenant context com bloqueio explícito para tenant ausente, tenant inativo, mismatch de tenant e membership inválida.
 - test: cobertura unitária para `Organization`, `Membership`, casos de uso de criação de tenant/membership e login tenant-bound; suites de integração e functional ampliadas para multi-tenancy.

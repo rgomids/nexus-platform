@@ -7,6 +7,7 @@ RUN npm ci
 
 FROM dependencies AS build
 COPY nest-cli.json tsconfig.json tsconfig.build.json eslint.config.mjs jest.config.cjs ./
+COPY migrations ./migrations
 COPY src ./src
 RUN npm run build
 
@@ -15,5 +16,6 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/migrations ./migrations
 EXPOSE 3000
 CMD ["node", "dist/main.js"]

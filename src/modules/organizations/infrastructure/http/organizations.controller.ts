@@ -10,6 +10,8 @@ import {
 
 import { AuthenticatedPrincipal } from "../../../../shared/auth/authenticated-principal.decorator";
 import { AuthenticatedRequestGuard } from "../../../../shared/auth/authenticated-request.guard";
+import { AuthorizationGuard } from "../../../../shared/auth/authorization.guard";
+import { RequirePermission } from "../../../../shared/auth/require-permission.decorator";
 import type { AuthenticatedPrincipalDto } from "../../../identity/application/dto/authenticated-principal.dto";
 import { TenantContextGuard } from "../../../../shared/tenancy/tenant-context.guard";
 import { CreateOrganizationMembershipUseCase } from "../../application/use-cases/create-organization-membership.use-case";
@@ -44,19 +46,22 @@ export class OrganizationsController {
   }
 
   @Get(":id")
-  @UseGuards(AuthenticatedRequestGuard, TenantContextGuard)
+  @UseGuards(AuthenticatedRequestGuard, TenantContextGuard, AuthorizationGuard)
+  @RequirePermission("organization:view")
   public getOrganization(@Param() params: OrganizationIdParamsDto) {
     return this.getOrganizationByIdUseCase.execute(params.id);
   }
 
   @Patch(":id/inactive")
-  @UseGuards(AuthenticatedRequestGuard, TenantContextGuard)
+  @UseGuards(AuthenticatedRequestGuard, TenantContextGuard, AuthorizationGuard)
+  @RequirePermission("organization:deactivate")
   public deactivateOrganization(@Param() params: OrganizationIdParamsDto) {
     return this.deactivateOrganizationUseCase.execute(params.id);
   }
 
   @Post(":id/memberships")
-  @UseGuards(AuthenticatedRequestGuard, TenantContextGuard)
+  @UseGuards(AuthenticatedRequestGuard, TenantContextGuard, AuthorizationGuard)
+  @RequirePermission("membership:create")
   public createMembership(
     @Param() params: OrganizationIdParamsDto,
     @Body() body: CreateOrganizationMembershipRequestDto,
@@ -68,7 +73,8 @@ export class OrganizationsController {
   }
 
   @Get(":id/memberships")
-  @UseGuards(AuthenticatedRequestGuard, TenantContextGuard)
+  @UseGuards(AuthenticatedRequestGuard, TenantContextGuard, AuthorizationGuard)
+  @RequirePermission("membership:view")
   public listMemberships(@Param() params: OrganizationIdParamsDto) {
     return this.listOrganizationMembershipsUseCase.execute(params.id);
   }

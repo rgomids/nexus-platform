@@ -24,6 +24,9 @@ describe("CreateOrganizationUseCase", () => {
         userId: "user-1",
       }),
     };
+    const accessControlBootstrapContract = {
+      bootstrapTenantAccessControl: jest.fn().mockResolvedValue(undefined),
+    };
     const databaseExecutor = {
       withTransaction: jest.fn(async (operation: () => Promise<void>) => operation()),
     } as unknown as DatabaseExecutor;
@@ -31,6 +34,7 @@ describe("CreateOrganizationUseCase", () => {
     const useCase = new CreateOrganizationUseCase(
       organizationRepository as never,
       usersTenancyContract as never,
+      accessControlBootstrapContract as never,
       databaseExecutor,
       createLoggerMock(),
     );
@@ -45,6 +49,12 @@ describe("CreateOrganizationUseCase", () => {
     expect(usersTenancyContract.createMembership).toHaveBeenCalledWith({
       organizationId: result.organizationId,
       userId: "user-1",
+    });
+    expect(
+      accessControlBootstrapContract.bootstrapTenantAccessControl,
+    ).toHaveBeenCalledWith({
+      createdByUserId: "user-1",
+      organizationId: result.organizationId,
     });
     expect(result.status).toBe("active");
   });

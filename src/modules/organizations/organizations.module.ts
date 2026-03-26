@@ -1,7 +1,12 @@
 import { forwardRef, Module } from "@nestjs/common";
 
+import { AccessControlModule } from "../access-control/access-control.module";
 import { IdentityModule } from "../identity/identity.module";
 import { UsersModule } from "../users/users.module";
+import { AuthenticatedRequestGuard } from "../../shared/auth/authenticated-request.guard";
+import { AuthorizationGuard } from "../../shared/auth/authorization.guard";
+import { TenantContextGuard } from "../../shared/tenancy/tenant-context.guard";
+import { TenantContextResolverService } from "../../shared/tenancy/tenant-context-resolver.service";
 import {
   ORGANIZATIONS_TENANCY_CONTRACT,
   type OrganizationsTenancyContract,
@@ -36,13 +41,17 @@ class OrganizationsTenancyContractAdapter implements OrganizationsTenancyContrac
 
 @Module({
   controllers: [OrganizationsController],
-  imports: [UsersModule, forwardRef(() => IdentityModule)],
+  imports: [UsersModule, forwardRef(() => AccessControlModule), forwardRef(() => IdentityModule)],
   providers: [
     CreateOrganizationUseCase,
     GetOrganizationByIdUseCase,
     DeactivateOrganizationUseCase,
     CreateOrganizationMembershipUseCase,
     ListOrganizationMembershipsUseCase,
+    TenantContextResolverService,
+    AuthenticatedRequestGuard,
+    TenantContextGuard,
+    AuthorizationGuard,
     PgOrganizationRepository,
     {
       provide: ORGANIZATION_REPOSITORY,
