@@ -19,6 +19,7 @@ describe("InvalidateSessionUseCase", () => {
       id: "session-1",
       jti: "jti-1",
       now: new Date(),
+      organizationId: "organization-1",
       userId: "user-1",
     });
     const sessionRepository = {
@@ -32,6 +33,7 @@ describe("InvalidateSessionUseCase", () => {
         verify: jest.fn().mockResolvedValue({
           aid: "account-1",
           jti: "jti-1",
+          oid: "organization-1",
           sid: "session-1",
           sub: "user-1",
         }),
@@ -51,6 +53,7 @@ describe("InvalidateSessionUseCase", () => {
       expiresAt: new Date(Date.now() + 60_000),
       id: "session-1",
       jti: "jti-1",
+      organizationId: "organization-1",
       revokedAt: new Date(),
       status: "revoked",
       updatedAt: new Date(),
@@ -65,6 +68,7 @@ describe("InvalidateSessionUseCase", () => {
         verify: jest.fn().mockResolvedValue({
           aid: "account-1",
           jti: "jti-1",
+          oid: "organization-1",
           sid: "session-1",
           sub: "user-1",
         }),

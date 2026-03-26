@@ -23,6 +23,7 @@ export class InvalidateSessionUseCase {
       session === null ||
       session.status !== "active" ||
       session.jti !== payload.jti ||
+      session.organizationId !== payload.oid ||
       session.isExpired(new Date())
     ) {
       throw new InvalidAccessTokenError();

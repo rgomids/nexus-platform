@@ -5,9 +5,22 @@ import { PinoLogger } from "nestjs-pino";
 
 import { ApplicationConfigService } from "../../../../bootstrap/config/application-config.service";
 import {
+  ORGANIZATIONS_TENANCY_CONTRACT,
+  type OrganizationsTenancyContract,
+} from "../../../organizations/application/contracts/organizations-tenancy.contract";
+import {
+  OrganizationInactiveError,
+  OrganizationNotFoundError,
+} from "../../../organizations/domain/organization.errors";
+import {
   USERS_IDENTITY_CONTRACT,
   type UsersIdentityContract,
 } from "../../../users/application/contracts/users-identity.contract";
+import {
+  USERS_TENANCY_CONTRACT,
+  type UsersTenancyContract,
+} from "../../../users/application/contracts/users-tenancy.contract";
+import { MembershipNotFoundError } from "../../../users/domain/user.errors";
 import { Session } from "../../domain/entities/session.entity";
 import { InvalidCredentialsError } from "../../domain/identity.errors";
 import { ACCOUNT_REPOSITORY, type AccountRepository } from "../../domain/repositories/account.repository";
@@ -20,9 +33,11 @@ import { EmailAddress } from "../../domain/value-objects/email-address.value-obj
 import type { AuthenticatedPrincipalDto } from "../dto/authenticated-principal.dto";
 import { ACCESS_TOKEN_SERVICE, type AccessTokenService } from "../ports/access-token.service";
 import { PASSWORD_HASHER, type PasswordHasher } from "../ports/password-hasher.port";
+import { TenantContextRequiredError } from "../../../../shared/tenancy/tenant.errors";
 
 export interface LoginWithPasswordInput {
   readonly email: string;
+  readonly organizationId?: string;
   readonly password: string;
 }
 
@@ -43,6 +58,10 @@ export class LoginWithPasswordUseCase {
     @Inject(ACCESS_TOKEN_SERVICE) private readonly accessTokenService: AccessTokenService,
     @Inject(USERS_IDENTITY_CONTRACT)
     private readonly usersIdentityContract: UsersIdentityContract,
+    @Inject(USERS_TENANCY_CONTRACT)
+    private readonly usersTenancyContract: UsersTenancyContract,
+    @Inject(ORGANIZATIONS_TENANCY_CONTRACT)
+    private readonly organizationsTenancyContract: OrganizationsTenancyContract,
     private readonly configuration: ApplicationConfigService,
     private readonly logger: PinoLogger,
   ) {
@@ -70,6 +89,7 @@ export class LoginWithPasswordUseCase {
       return this.failAuthentication();
     }
 
+    const organizationId = await this.resolveOrganizationContext(user.userId, input.organizationId);
     const now = new Date();
     const expiresAt = new Date(
       now.getTime() + 1000 * 60 * this.configuration.auth.jwtExpiresInMinutes,
@@ -80,6 +100,7 @@ export class LoginWithPasswordUseCase {
       id: randomUUID(),
       jti: randomUUID(),
       now,
+      organizationId,
       userId: user.userId,
     });
 
@@ -89,6 +110,7 @@ export class LoginWithPasswordUseCase {
       {
         aid: account.id,
         jti: session.jti,
+        oid: organizationId,
         sid: session.id,
         sub: user.userId,
       },
@@ -111,6 +133,7 @@ export class LoginWithPasswordUseCase {
         accountId: account.id,
         accountStatus: account.status,
         email: account.email.normalized,
+        organizationId,
         userId: user.userId,
         userStatus: user.status,
       },
@@ -122,5 +145,42 @@ export class LoginWithPasswordUseCase {
   private failAuthentication(): never {
     this.logger.warn({ event: "login_failed" }, "Identity login failed");
     throw new InvalidCredentialsError();
+  }
+
+  private async resolveOrganizationContext(
+    userId: string,
+    organizationId: string | undefined,
+  ): Promise<string | null> {
+    const activeMembershipCount = await this.usersTenancyContract.countActiveMemberships(userId);
+
+    if (activeMembershipCount === 0) {
+      if (organizationId !== undefined) {
+        throw new MembershipNotFoundError();
+      }
+
+      return null;
+    }
+
+    if (organizationId === undefined) {
+      throw new TenantContextRequiredError();
+    }
+
+    const organization = await this.organizationsTenancyContract.getOrganizationById(organizationId);
+
+    if (organization === null) {
+      throw new OrganizationNotFoundError();
+    }
+
+    if (organization.status !== "active") {
+      throw new OrganizationInactiveError();
+    }
+
+    const membership = await this.usersTenancyContract.findActiveMembership(userId, organizationId);
+
+    if (membership === null) {
+      throw new MembershipNotFoundError();
+    }
+
+    return organizationId;
   }
 }

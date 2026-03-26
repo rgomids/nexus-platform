@@ -9,6 +9,7 @@ import { AuditLogsModule } from "./modules/audit-logs/audit-logs.module";
 import { IdentityModule } from "./modules/identity/identity.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
 import { UsersModule } from "./modules/users/users.module";
+import { SecurityModule } from "./shared/security.module";
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { UsersModule } from "./modules/users/users.module";
     LoggingModule,
     DatabaseModule,
     HealthModule,
+    SecurityModule,
     IdentityModule,
     OrganizationsModule,
     UsersModule,

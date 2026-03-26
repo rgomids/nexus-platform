@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-03-26]
+- feature: implementação da Phase 2 — Multi-Tenancy com módulo `organizations`, `memberships` no módulo `users` e sessões autenticadas vinculadas a tenant.
+- feature: guards de principal autenticado e tenant context com bloqueio explícito para tenant ausente, tenant inativo, mismatch de tenant e membership inválida.
+- test: cobertura unitária para `Organization`, `Membership`, casos de uso de criação de tenant/membership e login tenant-bound; suites de integração e functional ampliadas para multi-tenancy.
+- docs: README, arquitetura, comandos, status de fase, handoff e ADR 0005 atualizados para a fundação multi-tenant.
+
 ## [2026-03-25]
 - feature: implementação da Phase 1 — Core Identity com criação de conta, login por email/senha e logout com sessão persistida.
 - feature: módulo `users` mínimo, módulo `identity` funcional, JWT de transporte, hash Argon2id e migrations SQL automáticas.

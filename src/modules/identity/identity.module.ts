@@ -1,6 +1,9 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 
+import { OrganizationsModule } from "../organizations/organizations.module";
 import { UsersModule } from "../users/users.module";
+import { ACCESS_TOKEN_SERVICE } from "./application/ports/access-token.service";
+import { PASSWORD_HASHER } from "./application/ports/password-hasher.port";
 import { CreateUserAccountUseCase } from "./application/use-cases/create-user-account.use-case";
 import { InvalidateSessionUseCase } from "./application/use-cases/invalidate-session.use-case";
 import { LoginWithPasswordUseCase } from "./application/use-cases/login-with-password.use-case";
@@ -15,12 +18,10 @@ import { PgCredentialRepository } from "./infrastructure/persistence/pg-credenti
 import { PgSessionRepository } from "./infrastructure/persistence/pg-session.repository";
 import { Argon2PasswordHasher } from "./infrastructure/security/argon2-password-hasher";
 import { JwtAccessTokenService } from "./infrastructure/security/jwt-access-token.service";
-import { ACCESS_TOKEN_SERVICE } from "./application/ports/access-token.service";
-import { PASSWORD_HASHER } from "./application/ports/password-hasher.port";
 
 @Module({
   controllers: [IdentityController],
-  imports: [UsersModule],
+  imports: [UsersModule, forwardRef(() => OrganizationsModule)],
   providers: [
     CredentialPolicyService,
     CreateUserAccountUseCase,
@@ -53,5 +54,6 @@ import { PASSWORD_HASHER } from "./application/ports/password-hasher.port";
       useExisting: JwtAccessTokenService,
     },
   ],
+  exports: [ResolveAuthenticatedPrincipalUseCase],
 })
 export class IdentityModule {}

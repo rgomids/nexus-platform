@@ -12,6 +12,7 @@ describe("Session", () => {
       id: "session-1",
       jti: "jti-1",
       now,
+      organizationId: "organization-1",
       userId: "user-1",
     });
 
@@ -28,6 +29,7 @@ describe("Session", () => {
       expiresAt: new Date("2026-03-25T13:00:00.000Z"),
       id: "session-1",
       jti: "jti-1",
+      organizationId: "organization-1",
       revokedAt: new Date("2026-03-25T12:30:00.000Z"),
       status: "revoked",
       updatedAt: new Date("2026-03-25T12:30:00.000Z"),
