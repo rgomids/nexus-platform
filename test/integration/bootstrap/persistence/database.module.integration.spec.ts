@@ -55,6 +55,8 @@ async function createTestingApplication() {
 
 function configureDatabaseEnvironment(container: StartedPostgreSqlContainer): void {
   process.env.APP_PORT = "3000";
+  process.env.AUTH_JWT_EXPIRES_IN_MINUTES = "30";
+  process.env.AUTH_JWT_SECRET = "integration-secret";
   process.env.DB_HOST = container.getHost();
   process.env.DB_NAME = container.getDatabase();
   process.env.DB_PASSWORD = container.getPassword();

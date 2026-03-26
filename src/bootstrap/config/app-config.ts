@@ -9,6 +9,10 @@ export interface AppConfig {
     readonly port: number;
     readonly nodeEnv: NodeEnvironment;
   };
+  readonly auth: {
+    readonly jwtExpiresInMinutes: number;
+    readonly jwtSecret: string;
+  };
   readonly database: {
     readonly host: string;
     readonly port: number;
@@ -34,6 +38,14 @@ export function loadAppConfig(environment: NodeJS.ProcessEnv = process.env): App
     app: {
       nodeEnv: readNodeEnvironment(environment.NODE_ENV),
       port: readRequiredNumber(environment.APP_PORT, "APP_PORT"),
+    },
+    auth: {
+      jwtExpiresInMinutes: readOptionalNumber(
+        environment.AUTH_JWT_EXPIRES_IN_MINUTES,
+        "AUTH_JWT_EXPIRES_IN_MINUTES",
+        480,
+      ),
+      jwtSecret: readRequiredString(environment.AUTH_JWT_SECRET, "AUTH_JWT_SECRET"),
     },
     database: {
       host: readRequiredString(environment.DB_HOST, "DB_HOST"),
@@ -75,4 +87,12 @@ function readRequiredNumber(value: string | undefined, key: string): number {
   }
 
   return parsedValue;
+}
+
+function readOptionalNumber(value: string | undefined, key: string, fallback: number): number {
+  if (value === undefined || value.trim().length === 0) {
+    return fallback;
+  }
+
+  return readRequiredNumber(value, key);
 }

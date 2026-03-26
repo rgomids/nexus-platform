@@ -1,27 +1,31 @@
 # Phase Status
 
 ## Fase atual
-- Nome: Phase 0 — Foundation
+- Nome: Phase 1 — Core Identity
 - Status: done
 - Responsável: Codex
 - Data: 2026-03-25
 
 ## Objetivo da fase
-- Estabelecer a base operacional do Nexus Platform com NestJS, TypeScript strict, PostgreSQL, observabilidade mínima, Docker e CI.
+- Validar a arquitetura modular com um fluxo funcional real de criação de conta, autenticação por email/senha e invalidação de sessão.
 
 ## Entradas
 - `AGENTS.md` e regras em `.agents/rules/*`
-- contexto do produto, mapa de módulos e ADRs 0001, 0002, 0003
+- contexto do produto, mapa de módulos e ADRs 0001, 0002, 0003 e 0004
+- página `Nexus Platform` no Notion
 
-## Saídas esperadas
-- aplicação subindo com `GET /health`
-- conexão PostgreSQL validada
-- estrutura modular criada
-- documentação operacional atualizada
+## Saídas entregues
+- módulo `users` com contrato interno mínimo
+- módulo `identity` com domínio, casos de uso, controllers e persistência
+- migrations SQL para `users`, `accounts`, `credentials` e `sessions`
+- validação HTTP global e tratamento padronizado de erro
+- logs estruturados para `account_created`, `login_succeeded`, `login_failed` e `session_invalidated`
+- documentação operacional atualizada para a fase
 
 ## Bloqueios
-- daemon Docker indisponível no ambiente local durante a validação desta execução
+- daemon Docker indisponível no ambiente local durante a validação desta execução, então suites de integração e funcional permaneceram puladas localmente
 
 ## Decisões / observações
-- `pg` foi adotado como adapter de conexão para evitar antecipar a escolha de ORM.
-- suites de integração e funcional usam Testcontainers e rodam integralmente quando Docker está disponível; localmente elas são puladas se o daemon estiver indisponível.
+- `users` passou a ser o dono do registro mínimo de usuário e `identity` consome apenas o contrato interno exportado.
+- JWT foi adotado apenas como contrato de transporte; a revogação real continua sendo determinada pela tabela `sessions`.
+- multi-tenancy, RBAC e auditoria completa permanecem fora do escopo desta fase.

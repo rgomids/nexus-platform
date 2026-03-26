@@ -10,6 +10,10 @@ export class ApplicationConfigService {
     return this.config.app.port;
   }
 
+  public get auth(): AppConfig["auth"] {
+    return this.config.auth;
+  }
+
   public get nodeEnv(): AppConfig["app"]["nodeEnv"] {
     return this.config.app.nodeEnv;
   }
