@@ -1,9 +1,9 @@
 import { Body, Controller, Headers, HttpCode, HttpStatus, Post } from "@nestjs/common";
 
-import { InvalidAccessTokenError } from "../../domain/identity.errors";
 import { CreateUserAccountUseCase } from "../../application/use-cases/create-user-account.use-case";
 import { InvalidateSessionUseCase } from "../../application/use-cases/invalidate-session.use-case";
 import { LoginWithPasswordUseCase } from "../../application/use-cases/login-with-password.use-case";
+import { readBearerAccessToken } from "../../../../shared/auth/read-bearer-access-token";
 import { CreateAccountRequestDto } from "./create-account.request";
 import { LoginRequestDto } from "./login.request";
 
@@ -29,22 +29,8 @@ export class IdentityController {
   @Post("logout")
   @HttpCode(HttpStatus.NO_CONTENT)
   public async logout(@Headers("authorization") authorization?: string): Promise<void> {
-    const accessToken = this.readAccessToken(authorization);
+    const accessToken = readBearerAccessToken(authorization);
 
     await this.invalidateSessionUseCase.execute(accessToken);
-  }
-
-  private readAccessToken(authorization?: string): string {
-    if (authorization === undefined) {
-      throw new InvalidAccessTokenError();
-    }
-
-    const [scheme, token] = authorization.split(" ");
-
-    if (scheme !== "Bearer" || token === undefined || token.length === 0) {
-      throw new InvalidAccessTokenError();
-    }
-
-    return token;
   }
 }

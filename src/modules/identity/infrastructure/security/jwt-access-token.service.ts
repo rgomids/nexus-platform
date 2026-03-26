@@ -50,6 +50,8 @@ export class JwtAccessTokenService implements AccessTokenService {
         throw new InvalidAccessTokenError();
       }
 
+      const organizationId = this.readOptionalStringClaim(payload, "oid");
+
       if (
         typeof payload.sub !== "string" ||
         typeof payload.sid !== "string" ||
@@ -62,11 +64,29 @@ export class JwtAccessTokenService implements AccessTokenService {
       return {
         aid: payload.aid,
         jti: payload.jti,
+        oid: organizationId,
         sid: payload.sid,
         sub: payload.sub,
       };
     } catch {
       throw new InvalidAccessTokenError();
     }
+  }
+
+  private readOptionalStringClaim(
+    payload: jwt.JwtPayload,
+    claim: string,
+  ): string | null {
+    const value: unknown = payload[claim];
+
+    if (value === undefined || value === null) {
+      return null;
+    }
+
+    if (typeof value !== "string") {
+      throw new InvalidAccessTokenError();
+    }
+
+    return value;
   }
 }

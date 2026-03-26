@@ -1,0 +1,51 @@
+import type { PinoLogger } from "nestjs-pino";
+
+import type { DatabaseExecutor } from "../../../../../src/bootstrap/persistence/database.executor";
+import { CreateOrganizationUseCase } from "../../../../../src/modules/organizations/application/use-cases/create-organization.use-case";
+import { Organization } from "../../../../../src/modules/organizations/domain/entities/organization.entity";
+
+function createLoggerMock(): PinoLogger {
+  return {
+    info: jest.fn(),
+    setContext: jest.fn(),
+  } as unknown as PinoLogger;
+}
+
+describe("CreateOrganizationUseCase", () => {
+  it("creates the organization and the creator membership in one transaction", async () => {
+    const organizationRepository = {
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    const usersTenancyContract = {
+      createMembership: jest.fn().mockResolvedValue({
+        membershipId: "membership-1",
+        organizationId: "organization-1",
+        status: "active",
+        userId: "user-1",
+      }),
+    };
+    const databaseExecutor = {
+      withTransaction: jest.fn(async (operation: () => Promise<void>) => operation()),
+    } as unknown as DatabaseExecutor;
+
+    const useCase = new CreateOrganizationUseCase(
+      organizationRepository as never,
+      usersTenancyContract as never,
+      databaseExecutor,
+      createLoggerMock(),
+    );
+
+    const result = await useCase.execute({
+      createdByUserId: "user-1",
+      name: "Acme Corp",
+    });
+
+    expect(databaseExecutor.withTransaction).toHaveBeenCalledTimes(1);
+    expect(organizationRepository.save).toHaveBeenCalledWith(expect.any(Organization));
+    expect(usersTenancyContract.createMembership).toHaveBeenCalledWith({
+      organizationId: result.organizationId,
+      userId: "user-1",
+    });
+    expect(result.status).toBe("active");
+  });
+});

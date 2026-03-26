@@ -10,6 +10,7 @@ interface SessionRow {
   readonly expires_at: Date;
   readonly id: string;
   readonly jti: string;
+  readonly organization_id: string | null;
   readonly revoked_at: Date | null;
   readonly status: "active" | "revoked";
   readonly updated_at: Date;
@@ -23,7 +24,7 @@ export class PgSessionRepository implements SessionRepository {
   public async findById(sessionId: string): Promise<Session | null> {
     const result = await this.databaseExecutor.query<SessionRow>(
       `
-        SELECT id, account_id, user_id, jti, status, created_at, updated_at, expires_at, revoked_at
+        SELECT id, account_id, user_id, organization_id, jti, status, created_at, updated_at, expires_at, revoked_at
         FROM sessions
         WHERE id = $1
       `,
@@ -42,13 +43,25 @@ export class PgSessionRepository implements SessionRepository {
   public async save(session: Session): Promise<void> {
     await this.databaseExecutor.query(
       `
-        INSERT INTO sessions (id, account_id, user_id, jti, status, created_at, updated_at, expires_at, revoked_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        INSERT INTO sessions (
+          id,
+          account_id,
+          user_id,
+          organization_id,
+          jti,
+          status,
+          created_at,
+          updated_at,
+          expires_at,
+          revoked_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `,
       [
         session.id,
         session.accountId,
         session.userId,
+        session.organizationId,
         session.jti,
         session.status,
         session.createdAt,
@@ -79,6 +92,7 @@ export class PgSessionRepository implements SessionRepository {
       expiresAt: new Date(row.expires_at),
       id: row.id,
       jti: row.jti,
+      organizationId: row.organization_id,
       revokedAt: row.revoked_at === null ? null : new Date(row.revoked_at),
       status: row.status,
       updatedAt: new Date(row.updated_at),

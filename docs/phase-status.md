@@ -1,31 +1,31 @@
 # Phase Status
 
 ## Fase atual
-- Nome: Phase 1 — Core Identity
+- Nome: Phase 2 — Multi-Tenancy
 - Status: done
 - Responsável: Codex
-- Data: 2026-03-25
+- Data: 2026-03-26
 
 ## Objetivo da fase
-- Validar a arquitetura modular com um fluxo funcional real de criação de conta, autenticação por email/senha e invalidação de sessão.
+- Estabelecer isolamento lógico por tenant com `organizations`, `memberships` e resolução explícita de tenant context em rotas protegidas.
 
 ## Entradas
 - `AGENTS.md` e regras em `.agents/rules/*`
 - contexto do produto, mapa de módulos e ADRs 0001, 0002, 0003 e 0004
 - página `Nexus Platform` no Notion
 
-## Saídas entregues
-- módulo `users` com contrato interno mínimo
-- módulo `identity` com domínio, casos de uso, controllers e persistência
-- migrations SQL para `users`, `accounts`, `credentials` e `sessions`
-- validação HTTP global e tratamento padronizado de erro
-- logs estruturados para `account_created`, `login_succeeded`, `login_failed` e `session_invalidated`
-- documentação operacional atualizada para a fase
+## Saídas esperadas
+- módulo `organizations` funcional com ciclo de vida do tenant
+- `users` evoluído com `memberships`
+- login tenant-bound com exceção de bootstrap
+- guards de principal autenticado e tenant context
+- migrations SQL para `organizations`, `memberships` e `sessions.organization_id`
+- documentação operacional atualizada para a nova fase
 
 ## Bloqueios
 - daemon Docker indisponível no ambiente local durante a validação desta execução, então suites de integração e funcional permaneceram puladas localmente
 
 ## Decisões / observações
-- `users` passou a ser o dono do registro mínimo de usuário e `identity` consome apenas o contrato interno exportado.
-- JWT foi adotado apenas como contrato de transporte; a revogação real continua sendo determinada pela tabela `sessions`.
-- multi-tenancy, RBAC e auditoria completa permanecem fora do escopo desta fase.
+- `users` é o dono de `memberships`; `organizations` coordena fluxos de tenant sem acessar internals de `users`.
+- `identity` passou a emitir sessões bootstrap ou tenant-bound, sempre com autoridade final na tabela `sessions`.
+- rotas tenant-scoped exigem tenant context explícito e falham por padrão quando o tenant não existe, está inativo ou não há membership ativa.

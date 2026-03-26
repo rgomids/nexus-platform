@@ -9,12 +9,14 @@ export class Session {
     readonly id: string;
     readonly jti: string;
     readonly now: Date;
+    readonly organizationId: string | null;
     readonly userId: string;
   }): Session {
     return new Session(
       props.id,
       props.accountId,
       props.userId,
+      props.organizationId,
       props.jti,
       "active",
       props.now,
@@ -30,6 +32,7 @@ export class Session {
     readonly expiresAt: Date;
     readonly id: string;
     readonly jti: string;
+    readonly organizationId: string | null;
     readonly revokedAt: Date | null;
     readonly status: SessionStatus;
     readonly updatedAt: Date;
@@ -39,6 +42,7 @@ export class Session {
       props.id,
       props.accountId,
       props.userId,
+      props.organizationId,
       props.jti,
       props.status,
       props.createdAt,
@@ -52,6 +56,7 @@ export class Session {
     public readonly id: string,
     public readonly accountId: string,
     public readonly userId: string,
+    public readonly organizationId: string | null,
     public readonly jti: string,
     public readonly status: SessionStatus,
     public readonly createdAt: Date,
@@ -69,6 +74,7 @@ export class Session {
       this.id,
       this.accountId,
       this.userId,
+      this.organizationId,
       this.jti,
       "revoked",
       this.createdAt,

@@ -28,6 +28,7 @@ export class ResolveAuthenticatedPrincipalUseCase {
       session === null ||
       session.status !== "active" ||
       session.jti !== payload.jti ||
+      session.organizationId !== payload.oid ||
       session.isExpired(new Date())
     ) {
       throw new InvalidAccessTokenError();
@@ -44,6 +45,7 @@ export class ResolveAuthenticatedPrincipalUseCase {
       accountId: account.id,
       accountStatus: account.status,
       email: account.email.normalized,
+      organizationId: session.organizationId,
       sessionId: session.id,
       userId: user.userId,
       userStatus: user.status,

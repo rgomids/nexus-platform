@@ -4,6 +4,7 @@ import type { UserStatus } from "../../../users/domain/entities/user.entity";
 export interface AuthenticatedPrincipalDto {
   readonly accountId: string;
   readonly email: string;
+  readonly organizationId: string | null;
   readonly sessionId: string;
   readonly userId: string;
   readonly accountStatus: AccountStatus;

@@ -4,7 +4,7 @@ Multi-tenant backend platform for identity, organizations, users, access control
 
 ## 🚧 Project Status
 
-Current Phase: **Phase 1 — Core Identity**
+Current Phase: **Phase 2 — Multi-Tenancy**
 
 Notion reference: [Nexus Platform](https://www.notion.so/mrgomides/Nexus-Platform-32fe01f2262680cd9e32db2b5cdd8f7b?source=copy_link)
 
@@ -22,17 +22,15 @@ Notion reference: [Nexus Platform](https://www.notion.so/mrgomides/Nexus-Platfor
 - Docker
 - GitHub Actions
 
-## What Phase 1 Delivers
+## What Phase 2 Delivers
 
-- minimal `users` ownership for internal user records
-- `identity` domain with `Account`, `Credential` and `Session`
-- account creation with unique global email
-- login with email and password
-- persisted and revocable sessions
-- JWT as transport contract backed by persisted sessions
-- SQL migrations applied automatically during bootstrap
-- HTTP validation and standardized error handling
-- structured security-aware logging for identity flows
+- `organizations` module with tenant lifecycle (`active|inactive`)
+- `users` ownership for `memberships` between users and organizations
+- tenant-bound login with controlled bootstrap sessions for users without memberships
+- protected tenant context resolution with explicit deny-by-default guards
+- SQL migrations for `organizations`, `memberships` and `sessions.organization_id`
+- structured logs for organization, membership and tenant-context events
+- unit, integration and functional coverage for the multi-tenant base
 
 ## Available Endpoints
 
@@ -40,29 +38,35 @@ Notion reference: [Nexus Platform](https://www.notion.so/mrgomides/Nexus-Platfor
 - `POST /identity/accounts`
 - `POST /identity/login`
 - `POST /identity/logout`
+- `POST /organizations`
+- `GET /organizations/:id`
+- `PATCH /organizations/:id/inactive`
+- `POST /organizations/:id/memberships`
+- `GET /organizations/:id/memberships`
 
-## Login Flow
+## Tenant Context Flow
 
 ```text
-Create account
-  -> validate full name, email and password
-  -> create user
+Bootstrap path
   -> create account
-  -> hash password with Argon2id
-  -> persist credential
+  -> login without organizationId when user has zero active memberships
+  -> create organization
+  -> creator receives first active membership
 
-Login
-  -> validate email
-  -> load account + user + credential
-  -> verify password hash
-  -> create persisted session
-  -> issue JWT with sub, aid, sid and jti
-
-Logout
-  -> verify JWT
-  -> load session
-  -> revoke persisted session
+Tenant-bound path
+  -> login with email, password and organizationId
+  -> validate active organization
+  -> validate active membership for user + organization
+  -> create persisted session bound to organization_id
+  -> resolve tenant context on protected routes
+  -> deny requests with missing, inactive or mismatched tenant context
 ```
+
+## Core Entities Added In Phase 2
+
+- `Organization`
+- `Membership`
+- `Session.organizationId`
 
 ## Project Structure
 
@@ -80,14 +84,19 @@ src/
       application/
       domain/
       infrastructure/
+    organizations/
+      application/
+      domain/
+      infrastructure/
     users/
       application/
       domain/
       infrastructure/
-    organizations/
     access-control/
     audit-logs/
   shared/
+    auth/
+    tenancy/
     domain/
 test/
   unit/
@@ -146,13 +155,26 @@ npm run test:functional
 
 `integration` and `functional` suites use Testcontainers and require a running Docker daemon. When Docker is unavailable, those suites are skipped locally; CI runs them with Docker enabled.
 
+## Authentication And Tenant Notes
+
+- `POST /identity/login` accepts `organizationId` for tenant-bound sessions.
+- If a user has at least one active membership, `organizationId` is mandatory at login.
+- If a user has zero active memberships, login can create a bootstrap session with `organizationId = null`.
+- Bootstrap sessions can authenticate `POST /organizations`, but tenant-scoped routes require a resolved tenant context.
+- Protected tenant-scoped routes validate:
+  - authenticated principal
+  - `organizationId` bound to the session
+  - active organization
+  - active membership for the authenticated user
+
 ## Architecture Notes
 
 - Modular Monolith remains the deployment model.
-- `users` owns the internal user record and exposes a narrow contract to `identity`.
-- `identity` owns `accounts`, `credentials` and `sessions`.
+- `users` owns the global user record and all `memberships`.
+- `organizations` owns tenant lifecycle and coordinates organization-scoped flows.
+- `identity` owns `accounts`, `credentials` and `sessions`, but consumes tenant contracts from `organizations` and `users`.
 - PostgreSQL access stays explicit through repositories and SQL, without ORM.
-- Multi-tenancy, RBAC and full auditability remain mandatory next-phase constraints and are not implemented in Phase 1.
+- RBAC and full auditability remain next-phase constraints.
 
 ## Documentation
 
