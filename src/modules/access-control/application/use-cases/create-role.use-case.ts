@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { PinoLogger } from "nestjs-pino";
 
+import { DatabaseExecutor } from "../../../../bootstrap/persistence/database.executor";
+import { InternalEventBus } from "../../../../shared/events/internal-event-bus";
 import { Role } from "../../domain/entities/role.entity";
 import {
   ROLE_REPOSITORY,
@@ -21,6 +23,8 @@ export class CreateRoleUseCase {
   public constructor(
     @Inject(ROLE_REPOSITORY)
     private readonly roleRepository: RoleRepository,
+    private readonly databaseExecutor: DatabaseExecutor,
+    private readonly internalEventBus: InternalEventBus,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(CreateRoleUseCase.name);
@@ -35,7 +39,18 @@ export class CreateRoleUseCase {
       organizationId: input.organizationId,
     });
 
-    await this.roleRepository.save(role);
+    await this.databaseExecutor.withTransaction(async () => {
+      await this.roleRepository.save(role);
+      await this.internalEventBus.publish({
+        actorUserId: input.actorUserId,
+        name: role.name,
+        occurredAt: role.createdAt,
+        organizationId: role.organizationId,
+        roleId: role.id,
+        type: "access_control.role_created",
+      });
+    });
+
     this.logger.info(
       {
         event: "role_created",

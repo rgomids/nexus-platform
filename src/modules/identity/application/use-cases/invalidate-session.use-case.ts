@@ -1,6 +1,8 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { PinoLogger } from "nestjs-pino";
 
+import { DatabaseExecutor } from "../../../../bootstrap/persistence/database.executor";
+import { InternalEventBus } from "../../../../shared/events/internal-event-bus";
 import { InvalidAccessTokenError } from "../../domain/identity.errors";
 import { SESSION_REPOSITORY, type SessionRepository } from "../../domain/repositories/session.repository";
 import { ACCESS_TOKEN_SERVICE, type AccessTokenService } from "../ports/access-token.service";
@@ -10,6 +12,8 @@ export class InvalidateSessionUseCase {
   public constructor(
     @Inject(SESSION_REPOSITORY) private readonly sessionRepository: SessionRepository,
     @Inject(ACCESS_TOKEN_SERVICE) private readonly accessTokenService: AccessTokenService,
+    private readonly databaseExecutor: DatabaseExecutor,
+    private readonly internalEventBus: InternalEventBus,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(InvalidateSessionUseCase.name);
@@ -31,7 +35,17 @@ export class InvalidateSessionUseCase {
 
     const revokedSession = session.revoke(new Date());
 
-    await this.sessionRepository.update(revokedSession);
+    await this.databaseExecutor.withTransaction(async () => {
+      await this.sessionRepository.update(revokedSession);
+      await this.internalEventBus.publish({
+        accountId: revokedSession.accountId,
+        occurredAt: revokedSession.updatedAt,
+        organizationId: revokedSession.organizationId,
+        sessionId: revokedSession.id,
+        type: "identity.logout_succeeded",
+        userId: revokedSession.userId,
+      });
+    });
 
     this.logger.info(
       {

@@ -1,10 +1,10 @@
 # Nexus Platform
 
-Multi-tenant backend platform for identity, organizations, users, tenant-scoped RBAC and future immutable auditability. The codebase remains a modular monolith with DDD, Clean Architecture and explicit internal boundaries.
+Multi-tenant backend platform for identity, organizations, users, tenant-scoped RBAC and immutable auditability. The codebase remains a modular monolith with DDD, Clean Architecture and explicit internal boundaries.
 
 ## 🚧 Project Status
 
-Current Phase: **Phase 3 — RBAC**
+Current Phase: **Phase 4 — Auditability**
 
 Notion reference: [Nexus Platform](https://www.notion.so/mrgomides/Nexus-Platform-32fe01f2262680cd9e32db2b5cdd8f7b?source=copy_link)
 
@@ -22,15 +22,14 @@ Notion reference: [Nexus Platform](https://www.notion.so/mrgomides/Nexus-Platfor
 - Docker
 - GitHub Actions
 
-## What Phase 3 Delivers
+## What Phase 4 Delivers
 
-- tenant-scoped `roles`, `permissions`, `role_permissions` and `user_role_assignments`
-- explicit authorization policy with deny-by-default decisions
-- protected HTTP endpoints using `AuthenticatedRequestGuard -> tenant guard -> authorization guard`
-- session-scoped RBAC management endpoints for role creation, permission grants and user-role assignment
-- SQL migration that backfills `organization_admin` plus the default permission catalog for existing tenants
-- structured logs for `role_created`, `permission_granted`, `role_assigned`, `authorization_allowed` and `authorization_denied`
-- unit, integration and functional coverage for RBAC behavior
+- append-only `audit_logs` storage with immutable PostgreSQL protection against `UPDATE` and `DELETE`
+- minimal in-process internal event bus so audited side effects stay decoupled from the main modules
+- audit coverage for login, logout, organization lifecycle, membership assignment, RBAC changes and authorization denials
+- protected `GET /audit-logs` endpoint with tenant scoping and `audit:view` enforcement
+- correlation id propagation from the HTTP request boundary into persisted audit rows
+- unit, integration and functional coverage for audit domain rules, event persistence and tenant-scoped queries
 
 ## Available Endpoints
 
@@ -48,6 +47,7 @@ Notion reference: [Nexus Platform](https://www.notion.so/mrgomides/Nexus-Platfor
 - `POST /roles/:id/permissions`
 - `GET /permissions`
 - `POST /users/:id/roles`
+- `GET /audit-logs`
 
 ## Authorization Model
 
@@ -67,6 +67,39 @@ Authenticated User
 - The role is granted the full default permission catalog for this phase.
 - Existing active memberships were backfilled with `organization_admin` in the Phase 3 migration.
 - New organizations bootstrap the creator membership and the `organization_admin` assignment in the same transaction flow.
+
+## Auditability Model
+
+```text
+HTTP request
+  -> correlation id resolved at the request boundary
+  -> module executes the main use case
+  -> audited modules publish an internal event in-band
+  -> audit-logs subscriber appends an immutable row
+  -> GET /audit-logs reads by tenant with RBAC protection
+```
+
+### Audited actions
+
+- `login_success`
+- `login_failed`
+- `logout`
+- `organization_created`
+- `organization_deactivated`
+- `user_created`
+- `membership_assigned`
+- `role_created`
+- `permission_granted`
+- `role_assigned`
+- `authorization_denied`
+
+### Querying audit logs
+
+- `GET /audit-logs?tenantId=<organization-id>`
+- optional filters: `userId`, `action`, `from`, `to`
+- response fields: `id`, `timestamp`, `userId`, `tenantId`, `action`, `resource`, `metadata`, `correlationId`
+- `tenantId` in the query must match the active tenant from the authenticated session
+- bootstrap-session or failed-login rows may persist `tenantId = null` when no tenant context exists
 
 ### Default permission catalog
 
@@ -126,9 +159,14 @@ src/
       domain/
       infrastructure/
     audit-logs/
+      application/
+      domain/
+      infrastructure/
   shared/
     auth/
+    events/
     tenancy/
+    request-correlation/
     domain/
 test/
   unit/
@@ -194,8 +232,10 @@ npm run test:functional
 - `organizations` owns tenant lifecycle and tenant-scoped membership flows.
 - `users` owns the global user record and `memberships`.
 - `access-control` owns roles, permissions, user-role assignments and the final authorization decision.
+- `audit-logs` owns the append-only audit trail plus tenant-scoped query access.
+- internal events are synchronous and in-process; they exist to decouple audit persistence, not to hide primary business flow.
 - PostgreSQL access stays explicit through repositories and SQL, without ORM.
-- Full append-only audit logs remain the next major phase.
+- append-only audit rows are now enforced in storage and correlated to the originating request when present.
 
 ## Documentation
 

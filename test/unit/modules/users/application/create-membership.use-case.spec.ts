@@ -7,6 +7,10 @@ import {
   UserNotFoundError,
 } from "../../../../../src/modules/users/domain/user.errors";
 import { User } from "../../../../../src/modules/users/domain/entities/user.entity";
+import {
+  createDatabaseExecutorMock,
+  createInternalEventBusMock,
+} from "../../../../support/unit-test-doubles";
 
 function createLoggerMock(): PinoLogger {
   return {
@@ -34,10 +38,13 @@ describe("CreateMembershipUseCase", () => {
     const useCase = new CreateMembershipUseCase(
       userRepository as never,
       membershipRepository as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
     const result = await useCase.execute({
+      actorUserId: "user-1",
       organizationId: "organization-1",
       userId: "user-1",
     });
@@ -52,11 +59,14 @@ describe("CreateMembershipUseCase", () => {
         findById: jest.fn().mockResolvedValue(null),
       } as never,
       {} as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
     await expect(
       useCase.execute({
+        actorUserId: "user-1",
         organizationId: "organization-1",
         userId: "user-1",
       }),
@@ -84,11 +94,14 @@ describe("CreateMembershipUseCase", () => {
           }),
         ),
       } as never,
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
     await expect(
       useCase.execute({
+        actorUserId: "user-1",
         organizationId: "organization-1",
         userId: "user-1",
       }),

@@ -1,6 +1,13 @@
 # Changelog
 
 ## [2026-03-26]
+- feature: implementação da Phase 4 — Auditability com módulo `audit-logs`, endpoint `GET /audit-logs` e migration `0004_audit_logs.sql`.
+- feature: bus interno síncrono e `RequestCorrelationContext` adicionados para desacoplar o append de auditoria e persistir `correlation_id`.
+- feature: fluxos de login, logout, criação de usuário, tenant, membership e RBAC agora publicam eventos auditáveis e geram rows append-only.
+- test: cobertura unitária do domínio, append/query e mapeamento de subscribers, além de novas suites de integração e functional para auditoria.
+- docs: README, arquitetura, comandos, status de fase, handoff e ADR 0007 atualizados para o rollout de auditabilidade.
+
+## [2026-03-26]
 - fix: `AccessControlModule` agora importa `IdentityModule` via `forwardRef`, corrigindo o ciclo `Identity -> Organizations -> AccessControl -> Identity` que ainda quebrava a CI de integração.
 - fix: `AccessControlModule` passou a prover localmente os guards e o resolvedor de tenant para evitar falha de DI dos endpoints RBAC durante os testes de integração.
 - fix: workflow de CI agora faz `docker compose down` apenas quando o arquivo `.env` foi preparado, evitando falha secundária no teardown.

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { PinoLogger } from "nestjs-pino";
 
+import { InternalEventBus } from "../../../../shared/events/internal-event-bus";
 import { Permission } from "../../domain/entities/permission.entity";
 import { RolePermission } from "../../domain/entities/role-permission.entity";
 import { Role } from "../../domain/entities/role.entity";
@@ -40,6 +41,7 @@ export class BootstrapTenantAccessControlUseCase {
     private readonly rolePermissionRepository: RolePermissionRepository,
     @Inject(USER_ROLE_ASSIGNMENT_REPOSITORY)
     private readonly userRoleAssignmentRepository: UserRoleAssignmentRepository,
+    private readonly internalEventBus: InternalEventBus,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(BootstrapTenantAccessControlUseCase.name);
@@ -68,6 +70,15 @@ export class BootstrapTenantAccessControlUseCase {
     });
 
     await this.roleRepository.save(role);
+    await this.internalEventBus.publish({
+      actorUserId: input.createdByUserId,
+      name: role.name,
+      occurredAt: role.createdAt,
+      organizationId: role.organizationId,
+      roleId: role.id,
+      type: "access_control.role_created",
+    });
+
     this.logger.info(
       {
         event: "role_created",
@@ -88,6 +99,15 @@ export class BootstrapTenantAccessControlUseCase {
       });
 
       await this.rolePermissionRepository.save(rolePermission);
+      await this.internalEventBus.publish({
+        actorUserId: input.createdByUserId,
+        occurredAt: rolePermission.createdAt,
+        organizationId: input.organizationId,
+        permissionCode: permission.code,
+        permissionId: permission.id,
+        roleId: role.id,
+        type: "access_control.permission_granted",
+      });
       this.logger.info(
         {
           event: "permission_granted",
@@ -110,6 +130,14 @@ export class BootstrapTenantAccessControlUseCase {
     });
 
     await this.userRoleAssignmentRepository.save(assignment);
+    await this.internalEventBus.publish({
+      actorUserId: input.createdByUserId,
+      occurredAt: assignment.createdAt,
+      organizationId: assignment.organizationId,
+      roleId: role.id,
+      targetUserId: input.createdByUserId,
+      type: "access_control.role_assigned",
+    });
     this.logger.info(
       {
         event: "role_assigned",

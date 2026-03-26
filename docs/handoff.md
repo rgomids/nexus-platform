@@ -1,52 +1,50 @@
 # Handoff
 
 ## Contexto
-- Objetivo da tarefa: implementar a Phase 3 — RBAC por tenant do Nexus Platform.
+- Objetivo da tarefa: implementar a Phase 4 — Auditability do Nexus Platform.
 - Fase atual: concluída.
-- Escopo atendido: módulo `access-control`, guards de autorização, migration RBAC, endpoints de roles/permissões/assignments, testes e atualização documental.
+- Escopo atendido: módulo `audit-logs`, migration append-only, bus interno mínimo, endpoint de consulta, publicação de eventos nos fluxos críticos, testes e atualização documental.
 
 ## O que foi feito
-- módulo `access-control` implementado com `roles`, `permissions`, `role_permissions`, `user_role_assignments` e política explícita de autorização
-- `CreateOrganizationUseCase` passou a bootstrapar o catálogo RBAC do tenant e o role `organization_admin`
-- guards `ActiveTenantGuard` e `AuthorizationGuard` adicionados ao fluxo de segurança
-- endpoints de `organizations` protegidos por permissões explícitas e novas rotas RBAC session-scoped adicionadas
-- migration `0003_access_control_rbac.sql` criada com catálogo tenant-local e backfill de `organization_admin`
-- wiring do `AccessControlModule` ajustado para resolver guards no próprio contexto do módulo e eliminar a falha de DI observada na CI
-- import de `IdentityModule` em `AccessControlModule` trocado para `forwardRef` para quebrar o ciclo restante entre `identity`, `organizations` e `access-control`
-- teardown do workflow `CI` ajustado para não falhar quando a etapa que cria `.env` é pulada
+- módulo `audit-logs` implementado com entidade imutável, casos de uso de append/query, repositório PostgreSQL, controller HTTP e subscribers do bus interno
+- migration `0004_audit_logs.sql` criada com tabela `audit_logs`, índices e triggers que bloqueiam `UPDATE` e `DELETE`
+- `RequestCorrelationContext` e `InternalEventBus` adicionados para propagar `correlationId` e desacoplar a persistência de auditoria
+- fluxos de identity, organizations, users e access-control passaram a publicar eventos auditáveis
+- `AuthorizationGuard` passou a persistir `authorization_denied` sem alterar a resposta `403`
+- suites unitárias ampliadas para domínio, append/query e mapeamento de subscribers; suites de integração e functional receberam cobertura nova para auditabilidade
 
 ## Arquivos alterados
-- `src/modules/access-control/**/*`
-- `src/shared/auth/*`
-- `src/shared/tenancy/*`
+- `src/modules/audit-logs/**/*`
+- `src/shared/events/*`
+- `src/shared/request-correlation/*`
+- `src/modules/identity/**/*`
 - `src/modules/organizations/**/*`
-- `migrations/0003_access_control_rbac.sql`
+- `src/modules/users/**/*`
+- `src/modules/access-control/**/*`
+- `migrations/0004_audit_logs.sql`
 - `test/**/*`
-- `.github/workflows/ci.yml`
-- `README.md`, `CHANGELOG.md`, `docs/*`, `.agents/decisions/0006-rbac-tenant-local-permissions-and-admin-backfill.md`
+- `README.md`, `CHANGELOG.md`, `docs/*`, `.agents/decisions/0007-minimal-internal-event-bus-for-auditability.md`
 
 ## Decisões tomadas
-- `permissions` repetem código por tenant em vez de usar catálogo global.
-- backfill de `organization_admin` foi aplicado a todos os memberships ativos existentes.
-- `POST /organizations` permanece fora de RBAC para não quebrar o bootstrap do primeiro tenant.
-- a ausência de permissão sempre retorna `403 Permission denied`.
+- storage de auditoria é append-only no banco e não expõe nenhuma operação de update/delete em aplicação.
+- `GET /audit-logs` exige `audit:view` e só aceita `tenantId` igual ao tenant ativo da sessão.
+- falhas de audit append em ações mutáveis bem-sucedidas abortam a transação principal; falhas ao auditar `login_failed` e `authorization_denied` só geram log operacional.
 
 ## Testes
 - Unit: `npm run test:unit` executado com sucesso.
-- Integration: `npm run test:integration` executado; suites ficaram puladas por indisponibilidade do daemon Docker. As correções de DI e do ciclo de módulos foram adicionalmente validadas com compilação local dos grafos Nest que reproduzem o escopo falho da CI.
-- Functional: `npm run test:functional` executado; suites ficaram puladas por indisponibilidade do daemon Docker.
+- Integration: `npm run test:integration` executado; suites ficaram puladas por indisponibilidade do daemon Docker, mas os novos testes compilaram e a aplicação buildou com sucesso.
+- Functional: `npm run test:functional` executado; suites ficaram puladas por indisponibilidade do daemon Docker, mas os novos testes compilaram e a aplicação buildou com sucesso.
 
 ## Impactos avaliados
-- Tenant: validação continua obrigatória antes de qualquer decisão RBAC.
-- RBAC: deny-by-default ativo em endpoints protegidos e gerenciamento session-scoped implementado.
-- Audit logs: append-only ainda pendente para a próxima fase; nesta fase entraram apenas logs estruturados.
-- Observability: eventos estruturados de criação de role, grant de permissão, assignment e decisão allow/deny adicionados.
+- Tenant: queries e persistência de audit continuam tenant-aware; mismatch entre query e tenant ativo é negado.
+- RBAC: endpoint de consulta protegido por `audit:view`; denials seguem deny-by-default e agora deixam trilha persistida.
+- Audit logs: ações críticas existentes passam a gerar rows append-only com `correlationId`, `action`, `resource`, `metadata`, `userId` e `tenantId`.
+- Observability: eventos `audit_log_appended` e `audit_log_query` adicionados, além do log operacional para falha de append em fluxos de negação.
 
 ## Riscos e pendências
-- validar as suites de integração e functional com Docker ativo para evidência local completa do fluxo HTTP e da migration `0003`
-- decidir na próxima fase como auditar mudanças RBAC em storage append-only
-- evoluir a modelagem de papéis padrão além de `organization_admin` quando houver novos fluxos de produto
+- validar localmente as suites de integração e functional com Docker ativo para evidência end-to-end completa da migration `0004`
+- evoluir a matriz de ações para `user_updated` e `user_deactivated` quando os fluxos correspondentes existirem no produto
 
 ## Próximos passos recomendados
-1. Implementar Phase 4 com audit log append-only para login, mudanças RBAC e ações críticas.
-2. Validar as suites com Docker ativo localmente ou na CI para evidência end-to-end completa.
+1. Executar suites de integração e functional com Docker disponível para evidência local completa da Phase 4.
+2. Evoluir a modelagem de eventos internos se o projeto avançar para novos subscribers além de auditoria.

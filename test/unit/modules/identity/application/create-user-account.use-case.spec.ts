@@ -9,6 +9,7 @@ import {
 } from "../../../../../src/modules/identity/domain/identity.errors";
 import { CredentialPolicyService } from "../../../../../src/modules/identity/domain/services/credential-policy.service";
 import { EmailAddress } from "../../../../../src/modules/identity/domain/value-objects/email-address.value-object";
+import { createInternalEventBusMock } from "../../../../support/unit-test-doubles";
 
 function createLoggerMock(): PinoLogger {
   return {
@@ -52,6 +53,7 @@ describe("CreateUserAccountUseCase", () => {
       usersIdentityContract,
       new CredentialPolicyService(),
       databaseExecutor,
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -90,6 +92,7 @@ describe("CreateUserAccountUseCase", () => {
       {
         withTransaction: jest.fn(),
       } as unknown as DatabaseExecutor,
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 

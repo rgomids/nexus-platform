@@ -4,6 +4,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { PinoLogger } from "nestjs-pino";
 
 import { DatabaseExecutor } from "../../../../bootstrap/persistence/database.executor";
+import { InternalEventBus } from "../../../../shared/events/internal-event-bus";
 import {
   ACCESS_CONTROL_BOOTSTRAP_CONTRACT,
   type AccessControlBootstrapContract,
@@ -41,6 +42,7 @@ export class CreateOrganizationUseCase {
     @Inject(ACCESS_CONTROL_BOOTSTRAP_CONTRACT)
     private readonly accessControlBootstrapContract: AccessControlBootstrapContract,
     private readonly databaseExecutor: DatabaseExecutor,
+    private readonly internalEventBus: InternalEventBus,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(CreateOrganizationUseCase.name);
@@ -57,12 +59,20 @@ export class CreateOrganizationUseCase {
     await this.databaseExecutor.withTransaction(async () => {
       await this.organizationRepository.save(organization);
       await this.usersTenancyContract.createMembership({
+        actorUserId: input.createdByUserId,
         organizationId: organization.id,
         userId: input.createdByUserId,
       });
       await this.accessControlBootstrapContract.bootstrapTenantAccessControl({
         createdByUserId: input.createdByUserId,
         organizationId: organization.id,
+      });
+      await this.internalEventBus.publish({
+        actorUserId: input.createdByUserId,
+        name: organization.name,
+        occurredAt: organization.createdAt,
+        organizationId: organization.id,
+        type: "organization.created",
       });
     });
 

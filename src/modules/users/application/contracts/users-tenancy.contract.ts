@@ -3,6 +3,7 @@ import type { MembershipStatus } from "../../domain/entities/membership.entity";
 export const USERS_TENANCY_CONTRACT = Symbol("USERS_TENANCY_CONTRACT");
 
 export interface CreateMembershipInput {
+  readonly actorUserId: string;
   readonly organizationId: string;
   readonly userId: string;
 }

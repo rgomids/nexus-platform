@@ -9,6 +9,10 @@ import { EmailAddress } from "../../../../../src/modules/identity/domain/value-o
 import { OrganizationInactiveError } from "../../../../../src/modules/organizations/domain/organization.errors";
 import { MembershipNotFoundError } from "../../../../../src/modules/users/domain/user.errors";
 import { TenantContextRequiredError } from "../../../../../src/shared/tenancy/tenant.errors";
+import {
+  createDatabaseExecutorMock,
+  createInternalEventBusMock,
+} from "../../../../support/unit-test-doubles";
 
 function createLoggerMock(): PinoLogger {
   return {
@@ -84,6 +88,8 @@ describe("LoginWithPasswordUseCase", () => {
         }),
       } as never,
       createConfigService(),
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -145,6 +151,8 @@ describe("LoginWithPasswordUseCase", () => {
         getOrganizationById: jest.fn(),
       } as never,
       createConfigService(),
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -196,6 +204,8 @@ describe("LoginWithPasswordUseCase", () => {
         getOrganizationById: jest.fn(),
       } as never,
       createConfigService(),
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -247,6 +257,8 @@ describe("LoginWithPasswordUseCase", () => {
         getOrganizationById: jest.fn(),
       } as never,
       createConfigService(),
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -298,6 +310,8 @@ describe("LoginWithPasswordUseCase", () => {
         getOrganizationById: jest.fn(),
       } as never,
       createConfigService(),
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -353,6 +367,8 @@ describe("LoginWithPasswordUseCase", () => {
         }),
       } as never,
       createConfigService(),
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
@@ -410,6 +426,8 @@ describe("LoginWithPasswordUseCase", () => {
         }),
       } as never,
       createConfigService(),
+      createDatabaseExecutorMock(),
+      createInternalEventBusMock(),
       createLoggerMock(),
     );
 
