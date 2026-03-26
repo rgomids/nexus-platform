@@ -12,6 +12,7 @@
 - endpoints de `organizations` protegidos por permissões explícitas e novas rotas RBAC session-scoped adicionadas
 - migration `0003_access_control_rbac.sql` criada com catálogo tenant-local e backfill de `organization_admin`
 - wiring do `AccessControlModule` ajustado para resolver guards no próprio contexto do módulo e eliminar a falha de DI observada na CI
+- import de `IdentityModule` em `AccessControlModule` trocado para `forwardRef` para quebrar o ciclo restante entre `identity`, `organizations` e `access-control`
 - teardown do workflow `CI` ajustado para não falhar quando a etapa que cria `.env` é pulada
 
 ## Arquivos alterados
@@ -32,7 +33,7 @@
 
 ## Testes
 - Unit: `npm run test:unit` executado com sucesso.
-- Integration: `npm run test:integration` executado; suites ficaram puladas por indisponibilidade do daemon Docker. A correção de DI foi adicionalmente validada com compilação local do módulo Nest sem bootstrap HTTP completo.
+- Integration: `npm run test:integration` executado; suites ficaram puladas por indisponibilidade do daemon Docker. As correções de DI e do ciclo de módulos foram adicionalmente validadas com compilação local dos grafos Nest que reproduzem o escopo falho da CI.
 - Functional: `npm run test:functional` executado; suites ficaram puladas por indisponibilidade do daemon Docker.
 
 ## Impactos avaliados

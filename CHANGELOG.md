@@ -1,6 +1,7 @@
 # Changelog
 
 ## [2026-03-26]
+- fix: `AccessControlModule` agora importa `IdentityModule` via `forwardRef`, corrigindo o ciclo `Identity -> Organizations -> AccessControl -> Identity` que ainda quebrava a CI de integração.
 - fix: `AccessControlModule` passou a prover localmente os guards e o resolvedor de tenant para evitar falha de DI dos endpoints RBAC durante os testes de integração.
 - fix: workflow de CI agora faz `docker compose down` apenas quando o arquivo `.env` foi preparado, evitando falha secundária no teardown.
 - feature: implementação da Phase 3 — RBAC com módulo `access-control`, catálogo de permissões tenant-local, roles, grants e user-role assignments.

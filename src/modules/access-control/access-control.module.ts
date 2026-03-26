@@ -38,7 +38,11 @@ import { TenantContextResolverService } from "../../shared/tenancy/tenant-contex
 
 @Module({
   controllers: [AccessControlController],
-  imports: [UsersModule, IdentityModule, forwardRef(() => OrganizationsModule)],
+  imports: [
+    UsersModule,
+    forwardRef(() => IdentityModule),
+    forwardRef(() => OrganizationsModule),
+  ],
   providers: [
     BootstrapTenantAccessControlUseCase,
     CreateRoleUseCase,
