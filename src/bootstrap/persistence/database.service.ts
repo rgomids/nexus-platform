@@ -3,11 +3,13 @@ import { PinoLogger } from "nestjs-pino";
 import type { Pool } from "pg";
 
 import { DATABASE_POOL } from "./database.constants";
+import { DatabaseMigrationService } from "./migration.service";
 
 @Injectable()
 export class DatabaseConnectionService implements OnApplicationBootstrap, OnApplicationShutdown {
   public constructor(
     @Inject(DATABASE_POOL) private readonly pool: Pool,
+    private readonly migrationService: DatabaseMigrationService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(DatabaseConnectionService.name);
@@ -17,6 +19,7 @@ export class DatabaseConnectionService implements OnApplicationBootstrap, OnAppl
     this.logger.info({ event: "start" }, "Validating PostgreSQL connectivity");
 
     try {
+      await this.migrationService.runPendingMigrations();
       await this.pool.query("SELECT 1");
       this.logger.info({ event: "success" }, "PostgreSQL connectivity validated");
     } catch (error) {

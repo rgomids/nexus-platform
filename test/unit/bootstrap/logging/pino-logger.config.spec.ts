@@ -18,6 +18,10 @@ describe("buildPinoHttpConfiguration", () => {
         nodeEnv: "test",
         port: 3000,
       },
+      auth: {
+        jwtExpiresInMinutes: 30,
+        jwtSecret: "test-secret",
+      },
       database: {
         host: "localhost",
         name: "nexus",

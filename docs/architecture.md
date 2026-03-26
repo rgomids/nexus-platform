@@ -2,31 +2,41 @@
 
 ## Overview
 
-Phase 0 establishes the operational shell of the Nexus Platform without introducing business logic. The repository is organized as a modular monolith with explicit domain boundaries and a clean split between bootstrap/infrastructure concerns and future domain/application code.
+Phase 1 turns the foundation into a first functional slice of the platform. The repository remains a modular monolith, but now `users` and `identity` contain real domain/application/infrastructure code and a working authentication flow.
 
 ## C4-lite Diagram
 
 ```mermaid
 flowchart LR
-  user["Developer / CI"] --> app["Nexus Platform App\nNestJS + TypeScript"]
-  app --> health["Health Endpoint\nGET /health"]
-  app --> config["Configuration Layer\n.env + typed parser"]
-  app --> logging["Structured Logging\npino + correlation id"]
-  app --> telemetry["Telemetry Bootstrap\nOpenTelemetry SDK"]
-  app --> database["PostgreSQL\nconnectivity only"]
-  app --> modules["Business Modules\nidentity, organizations, users,\naccess-control, audit-logs"]
+  client["HTTP Client"] --> api["Nexus Platform API\nNestJS + TypeScript"]
+  api --> health["Health Endpoint\nGET /health"]
+  api --> identity["Identity Module\naccounts, credentials, sessions"]
+  identity --> users["Users Module\ninternal user contract"]
+  identity --> jwt["JWT Transport\nHS256"]
+  identity --> logs["Structured Logs\naccount/login/session events"]
+  api --> database["PostgreSQL\nSQL migrations + explicit repositories"]
+  api --> telemetry["OpenTelemetry Bootstrap"]
 ```
 
 ## Module Boundaries
 
-- `src/bootstrap`: app startup, HTTP entrypoints, config, logging, persistence and telemetry.
-- `src/modules`: business modules reserved for domain/application/infrastructure growth without cross-module shortcuts.
-- `src/shared`: shared technical and tactical building blocks that must not become a domain dumping ground.
-- `src/jobs`: scheduled/background workloads reserved for future phases.
+- `src/bootstrap`: startup, validation pipe, global error mapping, config, logging, migrations and database lifecycle.
+- `src/modules/users`: owns the minimal internal user record consumed by `identity`.
+- `src/modules/identity`: owns account creation, password hashing, login, session persistence, token issue and logout.
+- `src/modules/organizations`, `src/modules/access-control`, `src/modules/audit-logs`: still placeholders for later phases.
+- `src/shared`: shared technical/domain primitives that do not collapse module boundaries.
 
-## Architectural Decisions Active in Phase 0
+## Active Decisions in Phase 1
 
-- Modular Monolith as the initial deployment model.
-- PostgreSQL connectivity is established with `pg` directly, without ORM or schema ownership yet.
-- No domain rules, authentication, authorization or tenant logic are implemented in the foundation.
-- Multi-tenancy, deny-by-default authorization and immutable audit logs remain mandatory future constraints and must shape any new module contracts.
+- PostgreSQL still uses `pg` directly with explicit repository implementations.
+- SQL migrations are versioned in `migrations/` and applied automatically during bootstrap.
+- Passwords are hashed with Argon2id and never persisted in clear text.
+- JWT is only a transport token; revocation authority remains the persisted `sessions` table.
+- Authentication errors stay generic at the HTTP boundary to avoid leaking account existence or status.
+
+## Phase 1 Constraints Preserved
+
+- No tenant resolution yet in the authentication flow.
+- No RBAC enforcement yet.
+- No full audit log append-only module yet.
+- No external message bus or SSO/OIDC integration yet.
