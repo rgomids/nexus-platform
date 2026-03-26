@@ -11,6 +11,8 @@
 - guards `ActiveTenantGuard` e `AuthorizationGuard` adicionados ao fluxo de segurança
 - endpoints de `organizations` protegidos por permissões explícitas e novas rotas RBAC session-scoped adicionadas
 - migration `0003_access_control_rbac.sql` criada com catálogo tenant-local e backfill de `organization_admin`
+- wiring do `AccessControlModule` ajustado para resolver guards no próprio contexto do módulo e eliminar a falha de DI observada na CI
+- teardown do workflow `CI` ajustado para não falhar quando a etapa que cria `.env` é pulada
 
 ## Arquivos alterados
 - `src/modules/access-control/**/*`
@@ -19,6 +21,7 @@
 - `src/modules/organizations/**/*`
 - `migrations/0003_access_control_rbac.sql`
 - `test/**/*`
+- `.github/workflows/ci.yml`
 - `README.md`, `CHANGELOG.md`, `docs/*`, `.agents/decisions/0006-rbac-tenant-local-permissions-and-admin-backfill.md`
 
 ## Decisões tomadas
@@ -29,7 +32,7 @@
 
 ## Testes
 - Unit: `npm run test:unit` executado com sucesso.
-- Integration: `npm run test:integration` executado; suites ficaram puladas por indisponibilidade do daemon Docker.
+- Integration: `npm run test:integration` executado; suites ficaram puladas por indisponibilidade do daemon Docker. A correção de DI foi adicionalmente validada com compilação local do módulo Nest sem bootstrap HTTP completo.
 - Functional: `npm run test:functional` executado; suites ficaram puladas por indisponibilidade do daemon Docker.
 
 ## Impactos avaliados

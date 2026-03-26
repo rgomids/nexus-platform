@@ -1,5 +1,7 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 
+import { IdentityModule } from "../identity/identity.module";
+import { OrganizationsModule } from "../organizations/organizations.module";
 import { UsersModule } from "../users/users.module";
 import {
   ACCESS_CONTROL_BOOTSTRAP_CONTRACT,
@@ -29,10 +31,14 @@ import { PgPermissionRepository } from "./infrastructure/persistence/pg-permissi
 import { PgRolePermissionRepository } from "./infrastructure/persistence/pg-role-permission.repository";
 import { PgRoleRepository } from "./infrastructure/persistence/pg-role.repository";
 import { PgUserRoleAssignmentRepository } from "./infrastructure/persistence/pg-user-role-assignment.repository";
+import { AuthenticatedRequestGuard } from "../../shared/auth/authenticated-request.guard";
+import { AuthorizationGuard } from "../../shared/auth/authorization.guard";
+import { ActiveTenantGuard } from "../../shared/tenancy/active-tenant.guard";
+import { TenantContextResolverService } from "../../shared/tenancy/tenant-context-resolver.service";
 
 @Module({
   controllers: [AccessControlController],
-  imports: [UsersModule],
+  imports: [UsersModule, IdentityModule, forwardRef(() => OrganizationsModule)],
   providers: [
     BootstrapTenantAccessControlUseCase,
     CreateRoleUseCase,
@@ -41,6 +47,10 @@ import { PgUserRoleAssignmentRepository } from "./infrastructure/persistence/pg-
     GrantPermissionToRoleUseCase,
     AssignRoleToUserUseCase,
     AuthorizeActionUseCase,
+    TenantContextResolverService,
+    AuthenticatedRequestGuard,
+    ActiveTenantGuard,
+    AuthorizationGuard,
     PgRoleRepository,
     PgPermissionRepository,
     PgRolePermissionRepository,

@@ -1,6 +1,8 @@
 # Changelog
 
 ## [2026-03-26]
+- fix: `AccessControlModule` passou a prover localmente os guards e o resolvedor de tenant para evitar falha de DI dos endpoints RBAC durante os testes de integração.
+- fix: workflow de CI agora faz `docker compose down` apenas quando o arquivo `.env` foi preparado, evitando falha secundária no teardown.
 - feature: implementação da Phase 3 — RBAC com módulo `access-control`, catálogo de permissões tenant-local, roles, grants e user-role assignments.
 - feature: guards de tenant ativo e autorização deny-by-default aplicados aos endpoints RBAC e às rotas sensíveis de `organizations`.
 - feature: migration `0003_access_control_rbac.sql` com backfill de `organization_admin` para memberships ativas existentes.

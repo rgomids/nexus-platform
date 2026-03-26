@@ -60,4 +60,7 @@ jobs:
 
       - name: Docker shutdown
         if: always()
-        run: docker compose down -v --remove-orphans
+        run: |
+          if [ -f .env ]; then
+            docker compose down -v --remove-orphans
+          fi
