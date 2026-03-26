@@ -4,6 +4,7 @@
 - feature: implementação da Phase 3 — RBAC com módulo `access-control`, catálogo de permissões tenant-local, roles, grants e user-role assignments.
 - feature: guards de tenant ativo e autorização deny-by-default aplicados aos endpoints RBAC e às rotas sensíveis de `organizations`.
 - feature: migration `0003_access_control_rbac.sql` com backfill de `organization_admin` para memberships ativas existentes.
+- fix: imagem Docker de produção agora inclui as migrations SQL exigidas no bootstrap da aplicação.
 - test: cobertura unitária do domínio e dos casos de uso RBAC, além de suites de integração e functional ampliadas para autorização.
 - docs: README, arquitetura, comandos, status de fase, handoff e ADR 0006 atualizados para o rollout RBAC.
 
