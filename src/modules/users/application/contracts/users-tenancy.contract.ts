@@ -15,6 +15,12 @@ export interface MembershipSnapshot {
   readonly userId: string;
 }
 
+export interface ListMembershipsByOrganizationInput {
+  readonly limit: number;
+  readonly offset: number;
+  readonly organizationId: string;
+}
+
 export interface UsersTenancyContract {
   countActiveMemberships(userId: string): Promise<number>;
   createMembership(input: CreateMembershipInput): Promise<MembershipSnapshot>;
@@ -22,5 +28,7 @@ export interface UsersTenancyContract {
     userId: string,
     organizationId: string,
   ): Promise<MembershipSnapshot | null>;
-  listMembershipsByOrganization(organizationId: string): Promise<MembershipSnapshot[]>;
+  listMembershipsByOrganization(
+    input: ListMembershipsByOrganizationInput,
+  ): Promise<MembershipSnapshot[]>;
 }

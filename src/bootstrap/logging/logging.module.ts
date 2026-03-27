@@ -14,6 +14,7 @@ import { buildPinoHttpConfiguration } from "./pino-logger.config";
       inject: [APP_CONFIG],
       useFactory: (config: AppConfig) => ({
         pinoHttp: buildPinoHttpConfiguration(config),
+        renameContext: "module",
       }),
     }),
   ],

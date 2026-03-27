@@ -29,6 +29,8 @@ export class AuditLogsController {
     const input = {
       ...(query.action === undefined ? {} : { action: query.action }),
       ...(query.from === undefined ? {} : { from: new Date(query.from) }),
+      limit: query.limit ?? 50,
+      offset: query.offset ?? 0,
       tenantId: query.tenantId,
       ...(query.to === undefined ? {} : { to: new Date(query.to) }),
       ...(query.userId === undefined ? {} : { userId: query.userId }),

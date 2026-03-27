@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { PinoLogger } from "nestjs-pino";
 
 import { DatabaseExecutor } from "../../../../bootstrap/persistence/database.executor";
+import { ApplicationTelemetryService } from "../../../../bootstrap/telemetry/application-telemetry.service";
 import { InternalEventBus } from "../../../../shared/events/internal-event-bus";
 import { PermissionNotFoundError, RoleNotFoundError } from "../../domain/access-control.errors";
 import { RolePermission } from "../../domain/entities/role-permission.entity";
@@ -40,67 +41,83 @@ export class GrantPermissionToRoleUseCase {
     private readonly databaseExecutor: DatabaseExecutor,
     private readonly internalEventBus: InternalEventBus,
     private readonly logger: PinoLogger,
+    @Optional()
+    private readonly applicationTelemetryService?: ApplicationTelemetryService,
   ) {
     this.logger.setContext(GrantPermissionToRoleUseCase.name);
   }
 
   public async execute(input: GrantPermissionToRoleInput): Promise<RolePermissionView> {
-    const role = await this.roleRepository.findById(input.roleId, input.organizationId);
+    const executeOperation = async (): Promise<RolePermissionView> => {
+      const role = await this.roleRepository.findById(input.roleId, input.organizationId);
 
-    if (role === null) {
-      throw new RoleNotFoundError();
-    }
+      if (role === null) {
+        throw new RoleNotFoundError();
+      }
 
-    const permission = await this.permissionRepository.findByCode(
-      input.organizationId,
-      input.permissionCode,
-    );
+      const permission = await this.permissionRepository.findByCode(
+        input.organizationId,
+        input.permissionCode,
+      );
 
-    if (permission === null) {
-      throw new PermissionNotFoundError();
-    }
+      if (permission === null) {
+        throw new PermissionNotFoundError();
+      }
 
-    const rolePermission = RolePermission.create({
-      id: randomUUID(),
-      now: new Date(),
-      organizationId: input.organizationId,
-      permissionId: permission.id,
-      roleId: role.id,
-    });
-
-    await this.databaseExecutor.withTransaction(async () => {
-      await this.rolePermissionRepository.save(rolePermission);
-      await this.internalEventBus.publish({
-        actorUserId: input.actorUserId,
-        occurredAt: rolePermission.createdAt,
+      const rolePermission = RolePermission.create({
+        id: randomUUID(),
+        now: new Date(),
         organizationId: input.organizationId,
-        permissionCode: permission.code,
         permissionId: permission.id,
         roleId: role.id,
-        type: "access_control.permission_granted",
       });
-    });
 
-    this.logger.info(
-      {
-        event: "permission_granted",
-        organizationId: input.organizationId,
+      await this.databaseExecutor.withTransaction(async () => {
+        await this.rolePermissionRepository.save(rolePermission);
+        await this.internalEventBus.publish({
+          actorUserId: input.actorUserId,
+          occurredAt: rolePermission.createdAt,
+          organizationId: input.organizationId,
+          permissionCode: permission.code,
+          permissionId: permission.id,
+          roleId: role.id,
+          type: "access_control.permission_granted",
+        });
+      });
+
+      this.logger.info(
+        {
+          event: "permission_granted",
+          organizationId: input.organizationId,
+          permissionCode: permission.code,
+          permissionId: permission.id,
+          roleId: role.id,
+          userId: input.actorUserId,
+        },
+        "Permission granted to role",
+      );
+
+      return {
+        createdAt: rolePermission.createdAt.toISOString(),
+        organizationId: rolePermission.organizationId,
         permissionCode: permission.code,
         permissionId: permission.id,
         roleId: role.id,
-        userId: input.actorUserId,
-      },
-      "Permission granted to role",
-    );
-
-    return {
-      createdAt: rolePermission.createdAt.toISOString(),
-      organizationId: rolePermission.organizationId,
-      permissionCode: permission.code,
-      permissionId: permission.id,
-      roleId: role.id,
-      rolePermissionId: rolePermission.id,
-      updatedAt: rolePermission.updatedAt.toISOString(),
+        rolePermissionId: rolePermission.id,
+        updatedAt: rolePermission.updatedAt.toISOString(),
+      };
     };
+
+    if (this.applicationTelemetryService === undefined) {
+      return executeOperation();
+    }
+
+    return this.applicationTelemetryService.runInSpan(
+      "access_control.grant_permission_to_role",
+      {
+        "tenant.id": input.organizationId,
+      },
+      executeOperation,
+    );
   }
 }

@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
 
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { PinoLogger } from "nestjs-pino";
 
 import { ApplicationConfigService } from "../../../../bootstrap/config/application-config.service";
 import { DatabaseExecutor } from "../../../../bootstrap/persistence/database.executor";
-import type { NexusError } from "../../../../shared/domain/nexus.errors";
+import { ApplicationMetricsService } from "../../../../bootstrap/telemetry/application-metrics.service";
+import { ApplicationTelemetryService } from "../../../../bootstrap/telemetry/application-telemetry.service";
 import { InternalEventBus } from "../../../../shared/events/internal-event-bus";
+import { readErrorCode } from "../../../../shared/domain/read-error-code";
 import { TenantContextRequiredError } from "../../../../shared/tenancy/tenant.errors";
 import {
   ORGANIZATIONS_TENANCY_CONTRACT,
@@ -69,112 +71,136 @@ export class LoginWithPasswordUseCase {
     private readonly databaseExecutor: DatabaseExecutor,
     private readonly internalEventBus: InternalEventBus,
     private readonly logger: PinoLogger,
+    @Optional()
+    private readonly applicationTelemetryService?: ApplicationTelemetryService,
+    @Optional()
+    private readonly applicationMetricsService?: ApplicationMetricsService,
   ) {
     this.logger.setContext(LoginWithPasswordUseCase.name);
   }
 
   public async execute(input: LoginWithPasswordInput): Promise<LoginWithPasswordResult> {
-    const email = EmailAddress.create(input.email);
-    let failedUserId: string | null = null;
+    const executeOperation = async (): Promise<LoginWithPasswordResult> => {
+      const email = EmailAddress.create(input.email);
+      let failedUserId: string | null = null;
 
-    try {
-      const account = await this.accountRepository.findByEmail(email);
+      try {
+        const account = await this.accountRepository.findByEmail(email);
 
-      if (account === null || account.status !== "active") {
-        throw new InvalidCredentialsError();
-      }
+        if (account === null || account.status !== "active") {
+          throw new InvalidCredentialsError();
+        }
 
-      const user = await this.usersIdentityContract.getUserById(account.userId);
-      const credential = await this.credentialRepository.findByAccountId(account.id);
+        const user = await this.usersIdentityContract.getUserById(account.userId);
+        const credential = await this.credentialRepository.findByAccountId(account.id);
 
-      if (user === null || user.status !== "active" || credential === null) {
-        throw new InvalidCredentialsError();
-      }
+        if (user === null || user.status !== "active" || credential === null) {
+          throw new InvalidCredentialsError();
+        }
 
-      failedUserId = user.userId;
+        failedUserId = user.userId;
 
-      const passwordMatches = await this.passwordHasher.verify(
-        credential.passwordHash,
-        input.password,
-      );
+        const passwordMatches = await this.passwordHasher.verify(
+          credential.passwordHash,
+          input.password,
+        );
 
-      if (!passwordMatches) {
-        throw new InvalidCredentialsError();
-      }
+        if (!passwordMatches) {
+          throw new InvalidCredentialsError();
+        }
 
-      const organizationId = await this.resolveOrganizationContext(user.userId, input.organizationId);
-      const now = new Date();
-      const expiresAt = new Date(
-        now.getTime() + 1000 * 60 * this.configuration.auth.jwtExpiresInMinutes,
-      );
-      const session = Session.start({
-        accountId: account.id,
-        expiresAt,
-        id: randomUUID(),
-        jti: randomUUID(),
-        now,
-        organizationId,
-        userId: user.userId,
-      });
-
-      await this.databaseExecutor.withTransaction(async () => {
-        await this.sessionRepository.save(session);
-        await this.internalEventBus.publish({
+        const organizationId = await this.resolveOrganizationContext(
+          user.userId,
+          input.organizationId,
+        );
+        const now = new Date();
+        const expiresAt = new Date(
+          now.getTime() + 1000 * 60 * this.configuration.auth.jwtExpiresInMinutes,
+        );
+        const session = Session.start({
           accountId: account.id,
-          occurredAt: now,
-          organizationId,
-          sessionId: session.id,
-          type: "identity.login_succeeded",
-          userId: user.userId,
-        });
-      });
-
-      const accessToken = await this.accessTokenService.issue(
-        {
-          aid: account.id,
-          jti: session.jti,
-          oid: organizationId,
-          sid: session.id,
-          sub: user.userId,
-        },
-        expiresAt,
-      );
-
-      this.logger.info(
-        {
-          accountId: account.id,
-          event: "login_succeeded",
-          sessionId: session.id,
-          userId: user.userId,
-        },
-        "Identity login succeeded",
-      );
-
-      return {
-        accessToken,
-        principal: {
-          accountId: account.id,
-          accountStatus: account.status,
-          email: account.email.normalized,
+          expiresAt,
+          id: randomUUID(),
+          jti: randomUUID(),
+          now,
           organizationId,
           userId: user.userId,
-          userStatus: user.status,
-        },
-        sessionId: session.id,
-        tokenType: "Bearer",
-      };
-    } catch (error) {
-      if (this.isAuditableLoginFailure(error)) {
-        await this.publishLoginFailureAudit({
-          email: email.normalized,
-          organizationId: input.organizationId ?? null,
-          reason: this.readErrorCode(error),
-          userId: failedUserId,
         });
-      }
 
-      throw error;
+        await this.databaseExecutor.withTransaction(async () => {
+          await this.sessionRepository.save(session);
+          await this.internalEventBus.publish({
+            accountId: account.id,
+            occurredAt: now,
+            organizationId,
+            sessionId: session.id,
+            type: "identity.login_succeeded",
+            userId: user.userId,
+          });
+        });
+
+        const accessToken = await this.accessTokenService.issue(
+          {
+            aid: account.id,
+            jti: session.jti,
+            oid: organizationId,
+            sid: session.id,
+            sub: user.userId,
+          },
+          expiresAt,
+        );
+
+        this.applicationMetricsService?.recordLoginResult("success");
+        this.logger.info(
+          {
+            accountId: account.id,
+            event: "login_succeeded",
+            sessionId: session.id,
+            userId: user.userId,
+          },
+          "Identity login succeeded",
+        );
+
+        return {
+          accessToken,
+          principal: {
+            accountId: account.id,
+            accountStatus: account.status,
+            email: account.email.normalized,
+            organizationId,
+            userId: user.userId,
+            userStatus: user.status,
+          },
+          sessionId: session.id,
+          tokenType: "Bearer",
+        };
+      } catch (error) {
+        this.applicationMetricsService?.recordLoginResult("failure");
+
+        if (this.isAuditableLoginFailure(error)) {
+          await this.publishLoginFailureAudit({
+            email: email.normalized,
+            organizationId: input.organizationId ?? null,
+            reason: readErrorCode(error),
+            userId: failedUserId,
+          });
+        }
+
+        throw error;
+      }
+    };
+
+    if (this.applicationTelemetryService === undefined) {
+      return executeOperation();
     }
+
+    return this.applicationTelemetryService.runInSpan(
+      "identity.login_with_password",
+      {
+        "identity.has_organization": input.organizationId === undefined ? "false" : "true",
+      },
+      executeOperation,
+    );
   }
 
   private async resolveOrganizationContext(
@@ -264,16 +290,4 @@ export class LoginWithPasswordUseCase {
     }
   }
 
-  private readErrorCode(error: unknown): string {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      typeof (error as NexusError).code === "string"
-    ) {
-      return (error as NexusError).code;
-    }
-
-    return "unknown_error";
-  }
 }

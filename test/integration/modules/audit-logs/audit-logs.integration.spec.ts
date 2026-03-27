@@ -111,6 +111,7 @@ describeIfDocker("Audit logs integration", () => {
     const listAuditLogs = application.get(ListAuditLogsUseCase);
     const requestCorrelationContext = application.get(RequestCorrelationContext);
     const internalEventBus = application.get(InternalEventBus);
+    const pool = application.get<Pool>(DATABASE_POOL);
 
     const alphaOwner = await createUserAccount.execute({
       email: "alpha-audit@example.com",
@@ -144,26 +145,60 @@ describeIfDocker("Audit logs integration", () => {
       }),
     );
 
-    const alphaLogs = await listAuditLogs.execute({
+    const firstAuditPage = await listAuditLogs.execute({
+      limit: 2,
+      offset: 0,
+      tenantId: alphaOrganization.organizationId,
+    });
+    const secondAuditPage = await listAuditLogs.execute({
+      limit: 2,
+      offset: 2,
+      tenantId: alphaOrganization.organizationId,
+    });
+    const deniedLogs = await listAuditLogs.execute({
+      action: "authorization_denied",
+      limit: 10,
+      offset: 0,
       tenantId: alphaOrganization.organizationId,
     });
     const betaLogs = await listAuditLogs.execute({
+      limit: 10,
+      offset: 0,
       tenantId: betaOrganization.organizationId,
     });
+    const indexRows = await pool.query<{ indexname: string }>(
+      `
+        SELECT indexname
+        FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND tablename = 'audit_logs'
+        ORDER BY indexname ASC
+      `,
+    );
 
-    expect(alphaLogs.every((entry) => entry.tenantId === alphaOrganization.organizationId)).toBe(
+    expect(firstAuditPage.every((entry) => entry.tenantId === alphaOrganization.organizationId)).toBe(
       true,
+    );
+    expect(firstAuditPage).toHaveLength(2);
+    expect(secondAuditPage).toHaveLength(2);
+    expect(firstAuditPage.map((entry) => entry.id)).not.toEqual(
+      secondAuditPage.map((entry) => entry.id),
     );
     expect(betaLogs.every((entry) => entry.tenantId === betaOrganization.organizationId)).toBe(
       true,
     );
-    expect(alphaLogs).toEqual(
+    expect(deniedLogs).toEqual([
+      expect.objectContaining({
+        action: "authorization_denied",
+        correlationId: "request-abc-123",
+        tenantId: alphaOrganization.organizationId,
+      }),
+    ]);
+    expect(indexRows.rows.map((row) => row.indexname)).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({
-          action: "authorization_denied",
-          correlationId: "request-abc-123",
-          tenantId: alphaOrganization.organizationId,
-        }),
+        "idx_audit_logs_tenant_action_timestamp",
+        "idx_audit_logs_tenant_timestamp_id",
+        "idx_audit_logs_tenant_user_timestamp",
       ]),
     );
 

@@ -1,12 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  UseGuards,
-} from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 
 import { AuthenticatedPrincipal } from "../../../../shared/auth/authenticated-principal.decorator";
 import { AuthenticatedRequestGuard } from "../../../../shared/auth/authenticated-request.guard";
@@ -21,6 +13,7 @@ import { GetOrganizationByIdUseCase } from "../../application/use-cases/get-orga
 import { ListOrganizationMembershipsUseCase } from "../../application/use-cases/list-organization-memberships.use-case";
 import { CreateOrganizationMembershipRequestDto } from "./create-organization-membership.request";
 import { CreateOrganizationRequestDto } from "./create-organization.request";
+import { ListOrganizationMembershipsRequestDto } from "./list-organization-memberships.request";
 import { OrganizationIdParamsDto } from "./organization-id.params";
 
 @Controller("organizations")
@@ -83,7 +76,14 @@ export class OrganizationsController {
   @Get(":id/memberships")
   @UseGuards(AuthenticatedRequestGuard, TenantContextGuard, AuthorizationGuard)
   @RequirePermission("membership:view")
-  public listMemberships(@Param() params: OrganizationIdParamsDto) {
-    return this.listOrganizationMembershipsUseCase.execute(params.id);
+  public listMemberships(
+    @Param() params: OrganizationIdParamsDto,
+    @Query() query: ListOrganizationMembershipsRequestDto,
+  ) {
+    return this.listOrganizationMembershipsUseCase.execute({
+      limit: query.limit ?? 50,
+      offset: query.offset ?? 0,
+      organizationId: params.id,
+    });
   }
 }

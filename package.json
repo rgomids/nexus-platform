@@ -6,16 +6,21 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "nest build",
+    "ci": "npm run lint && npm run build && npm run test",
+    "dev": "nest start --watch",
     "db:migrate": "ts-node src/bootstrap/persistence/migrations/run-migrations.ts",
+    "docker:down": "docker compose down --remove-orphans",
+    "docker:logs": "docker compose logs -f app postgres",
+    "docker:up": "docker compose up -d --build",
     "start": "node dist/main.js",
-    "start:dev": "nest start --watch",
+    "start:dev": "npm run dev",
     "start:prod": "node dist/main.js",
     "lint": "eslint .",
     "test": "npm run test:unit && npm run test:integration && npm run test:functional",
     "test:unit": "jest --selectProjects unit",
     "test:integration": "jest --selectProjects integration --runInBand",
     "test:functional": "jest --selectProjects functional --runInBand",
-    "test:ci": "npm run lint && npm run build && npm run test"
+    "test:ci": "npm run ci"
   },
   "engines": {
     "node": ">=24.0.0",

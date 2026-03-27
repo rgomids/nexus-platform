@@ -6,6 +6,8 @@ export const AUDIT_LOG_REPOSITORY = Symbol("AUDIT_LOG_REPOSITORY");
 export interface ListAuditLogsFilters {
   readonly action?: AuditLogAction;
   readonly from?: Date;
+  readonly limit: number;
+  readonly offset: number;
   readonly tenantId: string;
   readonly to?: Date;
   readonly userId?: string;
