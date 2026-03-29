@@ -67,6 +67,7 @@ describeIfDocker("Organizations endpoints", () => {
       status: "active",
       userId: member.userId,
     });
+    expect(membershipResponse.headers["x-correlation-id"]).toBeDefined();
 
     const listMembershipsResponse = await request(httpServer)
       .get(`/organizations/${organization.organizationId}/memberships`)
@@ -79,6 +80,19 @@ describeIfDocker("Organizations endpoints", () => {
         status: "active",
         userId: owner.userId,
       }),
+      expect.objectContaining({
+        organizationId: organization.organizationId,
+        status: "active",
+        userId: member.userId,
+      }),
+    ]);
+
+    const paginatedMembershipsResponse = await request(httpServer)
+      .get(`/organizations/${organization.organizationId}/memberships?limit=1&offset=1`)
+      .set("Authorization", `Bearer ${tenantLogin.accessToken}`)
+      .expect(200);
+
+    expect(paginatedMembershipsResponse.body).toEqual([
       expect.objectContaining({
         organizationId: organization.organizationId,
         status: "active",
@@ -102,10 +116,9 @@ describeIfDocker("Organizations endpoints", () => {
       .set("Authorization", `Bearer ${bootstrapLogin.accessToken}`)
       .expect(403);
 
-    expect(response.body).toEqual({
-      error: "Forbidden",
+    expectCorrelatedErrorResponse(response, {
+      error: "tenant_context_required",
       message: "Tenant context is required",
-      statusCode: 403,
     });
   });
 
@@ -142,10 +155,9 @@ describeIfDocker("Organizations endpoints", () => {
       .set("Authorization", `Bearer ${betaTenantLogin.accessToken}`)
       .expect(403);
 
-    expect(crossTenantResponse.body).toEqual({
-      error: "Forbidden",
+    expectCorrelatedErrorResponse(crossTenantResponse, {
+      error: "tenant_context_denied",
       message: "Tenant access denied",
-      statusCode: 403,
     });
 
     const deactivateResponse = await request(httpServer)
@@ -160,10 +172,9 @@ describeIfDocker("Organizations endpoints", () => {
       .set("Authorization", `Bearer ${alphaTenantLogin.accessToken}`)
       .expect(400);
 
-    expect(inactiveResponse.body).toEqual({
-      error: "Bad Request",
+    expectCorrelatedErrorResponse(inactiveResponse, {
+      error: "organization_inactive",
       message: "Organization is inactive",
-      statusCode: 400,
     });
   });
 
@@ -184,13 +195,26 @@ describeIfDocker("Organizations endpoints", () => {
       })
       .expect(404);
 
-    expect(response.body).toEqual({
-      error: "Not Found",
+    expectCorrelatedErrorResponse(response, {
+      error: "membership_not_found",
       message: "Membership not found",
-      statusCode: 404,
     });
   });
 });
+
+function expectCorrelatedErrorResponse(
+  response: { body: unknown; headers: Record<string, unknown> },
+  expected: { readonly error: string; readonly message: string },
+): void {
+  expect(response.body).toEqual({
+    correlation_id: expect.any(String),
+    error: expected.error,
+    message: expected.message,
+  });
+  expect(response.headers["x-correlation-id"]).toBe(
+    (response.body as { correlation_id: string }).correlation_id,
+  );
+}
 
 async function createAccount(
   httpServer: Parameters<typeof request>[0],

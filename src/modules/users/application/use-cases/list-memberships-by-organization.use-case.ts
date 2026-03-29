@@ -4,7 +4,10 @@ import {
   MEMBERSHIP_REPOSITORY,
   type MembershipRepository,
 } from "../../domain/repositories/membership.repository";
-import type { MembershipSnapshot } from "../contracts/users-tenancy.contract";
+import type {
+  ListMembershipsByOrganizationInput,
+  MembershipSnapshot,
+} from "../contracts/users-tenancy.contract";
 
 @Injectable()
 export class ListMembershipsByOrganizationUseCase {
@@ -13,8 +16,10 @@ export class ListMembershipsByOrganizationUseCase {
     private readonly membershipRepository: MembershipRepository,
   ) {}
 
-  public async execute(organizationId: string): Promise<MembershipSnapshot[]> {
-    const memberships = await this.membershipRepository.findByOrganizationId(organizationId);
+  public async execute(
+    input: ListMembershipsByOrganizationInput,
+  ): Promise<MembershipSnapshot[]> {
+    const memberships = await this.membershipRepository.findByOrganizationId(input);
 
     return memberships.map((membership) => ({
       membershipId: membership.id,

@@ -55,8 +55,10 @@ class UsersTenancyContractAdapter implements UsersTenancyContract {
     return this.findActiveMembershipUseCase.execute(userId, organizationId);
   }
 
-  public listMembershipsByOrganization(organizationId: string) {
-    return this.listMembershipsByOrganizationUseCase.execute(organizationId);
+  public listMembershipsByOrganization(
+    input: Parameters<ListMembershipsByOrganizationUseCase["execute"]>[0],
+  ) {
+    return this.listMembershipsByOrganizationUseCase.execute(input);
   }
 }
 

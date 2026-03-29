@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { PinoLogger } from "nestjs-pino";
 
 import { DatabaseExecutor } from "../../../../bootstrap/persistence/database.executor";
+import { ApplicationTelemetryService } from "../../../../bootstrap/telemetry/application-telemetry.service";
 import { InternalEventBus } from "../../../../shared/events/internal-event-bus";
 import {
   USERS_IDENTITY_CONTRACT,
@@ -46,71 +47,87 @@ export class CreateUserAccountUseCase {
     private readonly databaseExecutor: DatabaseExecutor,
     private readonly internalEventBus: InternalEventBus,
     private readonly logger: PinoLogger,
+    @Optional()
+    private readonly applicationTelemetryService?: ApplicationTelemetryService,
   ) {
     this.logger.setContext(CreateUserAccountUseCase.name);
   }
 
   public async execute(input: CreateUserAccountInput): Promise<CreateUserAccountResult> {
-    const email = EmailAddress.create(input.email);
+    const executeOperation = async (): Promise<CreateUserAccountResult> => {
+      const email = EmailAddress.create(input.email);
 
-    this.credentialPolicy.ensurePasswordIsAllowed(input.password);
+      this.credentialPolicy.ensurePasswordIsAllowed(input.password);
 
-    const existingAccount = await this.accountRepository.findByEmail(email);
+      const existingAccount = await this.accountRepository.findByEmail(email);
 
-    if (existingAccount !== null) {
-      throw new DuplicateAccountEmailError();
+      if (existingAccount !== null) {
+        throw new DuplicateAccountEmailError();
+      }
+
+      const userId = randomUUID();
+      const accountId = randomUUID();
+      const now = new Date();
+
+      await this.databaseExecutor.withTransaction(async () => {
+        await this.usersIdentityContract.createUser({
+          fullName: input.fullName,
+          userId,
+        });
+
+        const account = Account.create({
+          email,
+          id: accountId,
+          now,
+          userId,
+        });
+
+        const passwordHash = await this.passwordHasher.hash(input.password);
+        const credential = Credential.create({
+          accountId,
+          now,
+          passwordHash,
+        });
+
+        await this.accountRepository.save(account);
+        await this.credentialRepository.save(credential);
+        await this.internalEventBus.publish({
+          accountId,
+          actorUserId: userId,
+          email: email.normalized,
+          occurredAt: now,
+          type: "user.created",
+          userId,
+        });
+      });
+
+      this.logger.info(
+        {
+          accountId,
+          event: "account_created",
+          userId,
+        },
+        "Identity account created",
+      );
+
+      return {
+        accountId,
+        email: email.normalized,
+        status: "active",
+        userId,
+      };
+    };
+
+    if (this.applicationTelemetryService === undefined) {
+      return executeOperation();
     }
 
-    const userId = randomUUID();
-    const accountId = randomUUID();
-    const now = new Date();
-
-    await this.databaseExecutor.withTransaction(async () => {
-      await this.usersIdentityContract.createUser({
-        fullName: input.fullName,
-        userId,
-      });
-
-      const account = Account.create({
-        email,
-        id: accountId,
-        now,
-        userId,
-      });
-
-      const passwordHash = await this.passwordHasher.hash(input.password);
-      const credential = Credential.create({
-        accountId,
-        now,
-        passwordHash,
-      });
-
-      await this.accountRepository.save(account);
-      await this.credentialRepository.save(credential);
-      await this.internalEventBus.publish({
-        accountId,
-        actorUserId: userId,
-        email: email.normalized,
-        occurredAt: now,
-        type: "user.created",
-        userId,
-      });
-    });
-
-    this.logger.info(
+    return this.applicationTelemetryService.runInSpan(
+      "identity.create_user_account",
       {
-        accountId,
-        event: "account_created",
-        userId,
+        "identity.email": input.email,
       },
-      "Identity account created",
+      executeOperation,
     );
-
-    return {
-      accountId,
-      email: email.normalized,
-      status: "active",
-      userId,
-    };
   }
 }

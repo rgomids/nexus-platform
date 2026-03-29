@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { PinoLogger } from "nestjs-pino";
 
+import { ApplicationMetricsService } from "../../../../bootstrap/telemetry/application-metrics.service";
+import { ApplicationTelemetryService } from "../../../../bootstrap/telemetry/application-telemetry.service";
 import { RequestCorrelationContext } from "../../../../shared/request-correlation/request-correlation.context";
 import {
   AUDIT_LOG_REPOSITORY,
@@ -31,36 +33,61 @@ export class AppendAuditLogUseCase {
     private readonly auditLogRepository: AuditLogRepository,
     private readonly requestCorrelationContext: RequestCorrelationContext,
     private readonly logger: PinoLogger,
+    @Optional()
+    private readonly applicationTelemetryService?: ApplicationTelemetryService,
+    @Optional()
+    private readonly applicationMetricsService?: ApplicationMetricsService,
   ) {
     this.logger.setContext(AppendAuditLogUseCase.name);
   }
 
   public async execute(input: AppendAuditLogInput): Promise<AuditLogView> {
-    const entry = AuditLogEntry.create({
-      action: input.action,
-      correlationId: this.requestCorrelationContext.getCorrelationIdOrDefault(),
-      id: randomUUID(),
-      metadata: input.metadata,
-      resource: input.resource,
-      tenantId: input.tenantId,
-      timestamp: input.timestamp ?? new Date(),
-      userId: input.userId,
-    });
+    const executeOperation = async (): Promise<AuditLogView> => {
+      const entry = AuditLogEntry.create({
+        action: input.action,
+        correlationId: this.requestCorrelationContext.getCorrelationIdOrDefault(),
+        id: randomUUID(),
+        metadata: input.metadata,
+        resource: input.resource,
+        tenantId: input.tenantId,
+        timestamp: input.timestamp ?? new Date(),
+        userId: input.userId,
+      });
+      const startedAt = performance.now();
 
-    await this.auditLogRepository.append(entry);
-    this.logger.info(
+      await this.auditLogRepository.append(entry);
+      this.applicationMetricsService?.recordAuditOperation({
+        durationMs: performance.now() - startedAt,
+        operation: "append",
+      });
+      this.logger.info(
+        {
+          action: entry.action,
+          correlationId: entry.correlationId,
+          event: "audit_log_appended",
+          resource: entry.resource,
+          tenantId: entry.tenantId,
+          userId: entry.userId,
+        },
+        "Audit log appended",
+      );
+
+      return mapAuditLogView(entry);
+    };
+
+    if (this.applicationTelemetryService === undefined) {
+      return executeOperation();
+    }
+
+    return this.applicationTelemetryService.runInSpan(
+      "audit_logs.append",
       {
-        action: entry.action,
-        correlationId: entry.correlationId,
-        event: "audit_log_appended",
-        resource: entry.resource,
-        tenantId: entry.tenantId,
-        userId: entry.userId,
+        "audit.action": input.action,
+        "audit.resource": input.resource,
+        "tenant.id": input.tenantId ?? "bootstrap",
       },
-      "Audit log appended",
+      executeOperation,
     );
-
-    return mapAuditLogView(entry);
   }
 }
 

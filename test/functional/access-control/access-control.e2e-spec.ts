@@ -121,10 +121,9 @@ describeIfDocker("Access control endpoints", () => {
       .set("Authorization", `Bearer ${memberTenantLogin.accessToken}`)
       .expect(403);
 
-    expect(deniedResponse.body).toEqual({
-      error: "Forbidden",
+    expectCorrelatedErrorResponse(deniedResponse, {
+      error: "permission_denied",
       message: "Permission denied",
-      statusCode: 403,
     });
 
     const roleResponse = await request(httpServer)
@@ -164,6 +163,20 @@ describeIfDocker("Access control endpoints", () => {
     ]);
   });
 });
+
+function expectCorrelatedErrorResponse(
+  response: { body: unknown; headers: Record<string, unknown> },
+  expected: { readonly error: string; readonly message: string },
+): void {
+  expect(response.body).toEqual({
+    correlation_id: expect.any(String),
+    error: expected.error,
+    message: expected.message,
+  });
+  expect(response.headers["x-correlation-id"]).toBe(
+    (response.body as { correlation_id: string }).correlation_id,
+  );
+}
 
 async function createAccount(
   httpServer: Parameters<typeof request>[0],

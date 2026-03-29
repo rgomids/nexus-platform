@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { PinoLogger } from "nestjs-pino";
 
 import { DatabaseExecutor } from "../../../../bootstrap/persistence/database.executor";
+import { ApplicationTelemetryService } from "../../../../bootstrap/telemetry/application-telemetry.service";
 import { InternalEventBus } from "../../../../shared/events/internal-event-bus";
 import {
   USERS_IDENTITY_CONTRACT,
@@ -47,70 +48,86 @@ export class AssignRoleToUserUseCase {
     private readonly databaseExecutor: DatabaseExecutor,
     private readonly internalEventBus: InternalEventBus,
     private readonly logger: PinoLogger,
+    @Optional()
+    private readonly applicationTelemetryService?: ApplicationTelemetryService,
   ) {
     this.logger.setContext(AssignRoleToUserUseCase.name);
   }
 
   public async execute(input: AssignRoleToUserInput): Promise<UserRoleAssignmentView> {
-    const user = await this.usersIdentityContract.getUserById(input.userId);
+    const executeOperation = async (): Promise<UserRoleAssignmentView> => {
+      const user = await this.usersIdentityContract.getUserById(input.userId);
 
-    if (user === null) {
-      throw new UserNotFoundError();
-    }
+      if (user === null) {
+        throw new UserNotFoundError();
+      }
 
-    const membership = await this.usersTenancyContract.findActiveMembership(
-      input.userId,
-      input.organizationId,
-    );
+      const membership = await this.usersTenancyContract.findActiveMembership(
+        input.userId,
+        input.organizationId,
+      );
 
-    if (membership === null) {
-      throw new MembershipNotFoundError();
-    }
+      if (membership === null) {
+        throw new MembershipNotFoundError();
+      }
 
-    const role = await this.roleRepository.findById(input.roleId, input.organizationId);
+      const role = await this.roleRepository.findById(input.roleId, input.organizationId);
 
-    if (role === null) {
-      throw new RoleNotFoundError();
-    }
+      if (role === null) {
+        throw new RoleNotFoundError();
+      }
 
-    const assignment = UserRoleAssignment.create({
-      id: randomUUID(),
-      now: new Date(),
-      organizationId: input.organizationId,
-      roleId: role.id,
-      userId: input.userId,
-    });
-
-    await this.databaseExecutor.withTransaction(async () => {
-      await this.userRoleAssignmentRepository.save(assignment);
-      await this.internalEventBus.publish({
-        actorUserId: input.actorUserId,
-        occurredAt: assignment.createdAt,
-        organizationId: assignment.organizationId,
-        roleId: role.id,
-        targetUserId: input.userId,
-        type: "access_control.role_assigned",
-      });
-    });
-
-    this.logger.info(
-      {
-        event: "role_assigned",
+      const assignment = UserRoleAssignment.create({
+        id: randomUUID(),
+        now: new Date(),
         organizationId: input.organizationId,
         roleId: role.id,
-        targetUserId: input.userId,
-        userId: input.actorUserId,
-      },
-      "Role assigned to user",
-    );
+        userId: input.userId,
+      });
 
-    return {
-      createdAt: assignment.createdAt.toISOString(),
-      organizationId: assignment.organizationId,
-      roleId: assignment.roleId,
-      updatedAt: assignment.updatedAt.toISOString(),
-      userId: assignment.userId,
-      userRoleAssignmentId: assignment.id,
+      await this.databaseExecutor.withTransaction(async () => {
+        await this.userRoleAssignmentRepository.save(assignment);
+        await this.internalEventBus.publish({
+          actorUserId: input.actorUserId,
+          occurredAt: assignment.createdAt,
+          organizationId: assignment.organizationId,
+          roleId: role.id,
+          targetUserId: input.userId,
+          type: "access_control.role_assigned",
+        });
+      });
+
+      this.logger.info(
+        {
+          event: "role_assigned",
+          organizationId: input.organizationId,
+          roleId: role.id,
+          targetUserId: input.userId,
+          userId: input.actorUserId,
+        },
+        "Role assigned to user",
+      );
+
+      return {
+        createdAt: assignment.createdAt.toISOString(),
+        organizationId: assignment.organizationId,
+        roleId: assignment.roleId,
+        updatedAt: assignment.updatedAt.toISOString(),
+        userId: assignment.userId,
+        userRoleAssignmentId: assignment.id,
+      };
     };
+
+    if (this.applicationTelemetryService === undefined) {
+      return executeOperation();
+    }
+
+    return this.applicationTelemetryService.runInSpan(
+      "access_control.assign_role_to_user",
+      {
+        "tenant.id": input.organizationId,
+      },
+      executeOperation,
+    );
   }
 }

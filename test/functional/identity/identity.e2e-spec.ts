@@ -50,6 +50,7 @@ describeIfDocker("Identity endpoints", () => {
       email: "jane@example.com",
       status: "active",
     });
+    expect(typeof createAccountResponse.headers["x-correlation-id"]).toBe("string");
 
     const loginResponse = await request(httpServer)
       .post("/identity/login")
@@ -65,6 +66,7 @@ describeIfDocker("Identity endpoints", () => {
         email: "jane@example.com",
       },
     });
+    expect(loginResponse.headers["x-correlation-id"]).toBeDefined();
 
     await request(httpServer)
       .post("/identity/logout")
@@ -88,10 +90,40 @@ describeIfDocker("Identity endpoints", () => {
       })
       .expect(401);
 
-    expect(response.body).toEqual({
-      error: "Unauthorized",
+    expectCorrelatedErrorResponse(response, {
+      error: "invalid_credentials",
       message: "Invalid credentials",
-      statusCode: 401,
+    });
+  });
+
+  it("fails fast on invalid input with a standardized validation payload", async () => {
+    const httpServer = application.getHttpServer() as Parameters<typeof request>[0];
+
+    const response = await request(httpServer)
+      .post("/identity/login")
+      .send({
+        email: "jane@example.com",
+        password: "short",
+      })
+      .expect(400);
+
+    expectCorrelatedErrorResponse(response, {
+      error: "invalid_request",
+      message: "password must be longer than or equal to 8 characters",
     });
   });
 });
+
+function expectCorrelatedErrorResponse(
+  response: { body: unknown; headers: Record<string, unknown> },
+  expected: { readonly error: string; readonly message: string },
+): void {
+  expect(response.body).toEqual({
+    correlation_id: expect.any(String),
+    error: expected.error,
+    message: expected.message,
+  });
+  expect(response.headers["x-correlation-id"]).toBe(
+    (response.body as { correlation_id: string }).correlation_id,
+  );
+}

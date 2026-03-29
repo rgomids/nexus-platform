@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 
 import {
+  type ListMembershipsByOrganizationInput,
   USERS_TENANCY_CONTRACT,
   type MembershipSnapshot,
   type UsersTenancyContract,
@@ -23,8 +24,10 @@ export class ListOrganizationMembershipsUseCase {
     private readonly usersTenancyContract: UsersTenancyContract,
   ) {}
 
-  public async execute(organizationId: string): Promise<MembershipSnapshot[]> {
-    const organization = await this.organizationRepository.findById(organizationId);
+  public async execute(
+    input: ListMembershipsByOrganizationInput,
+  ): Promise<MembershipSnapshot[]> {
+    const organization = await this.organizationRepository.findById(input.organizationId);
 
     if (organization === null) {
       throw new OrganizationNotFoundError();
@@ -34,6 +37,6 @@ export class ListOrganizationMembershipsUseCase {
       throw new OrganizationInactiveError();
     }
 
-    return this.usersTenancyContract.listMembershipsByOrganization(organizationId);
+    return this.usersTenancyContract.listMembershipsByOrganization(input);
   }
 }

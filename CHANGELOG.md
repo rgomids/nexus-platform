@@ -1,6 +1,12 @@
 # Changelog
 
 ## [2026-03-26]
+- feature: implementação da Phase 5 — Quality, Observability & Engineering com contrato de erro padronizado, `GET /metrics`, spans adicionais e logs estruturados/sanitizados.
+- feature: paginação pública adicionada a `GET /audit-logs` e `GET /organizations/:id/memberships`, com novos índices compostos na migration `0005_quality_observability_engineering.sql`.
+- test: cobertura unitária, de integração e funcional ampliada para validação, `correlation_id`, métricas, autorização deny-by-default e paginação tenant-aware.
+- docs: README, comandos, arquitetura, status de fase, handoff e ADR 0008 atualizados para refletir a Phase 5.
+
+## [2026-03-26]
 - feature: implementação da Phase 4 — Auditability com módulo `audit-logs`, endpoint `GET /audit-logs` e migration `0004_audit_logs.sql`.
 - feature: bus interno síncrono e `RequestCorrelationContext` adicionados para desacoplar o append de auditoria e persistir `correlation_id`.
 - feature: fluxos de login, logout, criação de usuário, tenant, membership e RBAC agora publicam eventos auditáveis e geram rows append-only.

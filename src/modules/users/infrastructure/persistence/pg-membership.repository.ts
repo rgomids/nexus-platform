@@ -2,7 +2,10 @@ import { Injectable } from "@nestjs/common";
 
 import { DatabaseExecutor } from "../../../../bootstrap/persistence/database.executor";
 import { Membership } from "../../domain/entities/membership.entity";
-import type { MembershipRepository } from "../../domain/repositories/membership.repository";
+import type {
+  ListMembershipsByOrganizationFilters,
+  MembershipRepository,
+} from "../../domain/repositories/membership.repository";
 import { MembershipAlreadyExistsError } from "../../domain/user.errors";
 
 interface MembershipRow {
@@ -56,15 +59,19 @@ export class PgMembershipRepository implements MembershipRepository {
     return this.mapRow(row);
   }
 
-  public async findByOrganizationId(organizationId: string): Promise<Membership[]> {
+  public async findByOrganizationId(
+    filters: ListMembershipsByOrganizationFilters,
+  ): Promise<Membership[]> {
     const result = await this.databaseExecutor.query<MembershipRow>(
       `
         SELECT id, organization_id, user_id, status, created_at, updated_at
         FROM memberships
         WHERE organization_id = $1
-        ORDER BY created_at ASC
+        ORDER BY created_at ASC, id ASC
+        LIMIT $2
+        OFFSET $3
       `,
-      [organizationId],
+      [filters.organizationId, filters.limit, filters.offset],
     );
 
     return result.rows.map((row) => this.mapRow(row));

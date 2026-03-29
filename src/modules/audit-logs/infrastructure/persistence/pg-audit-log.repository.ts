@@ -71,6 +71,11 @@ export class PgAuditLogRepository implements AuditLogRepository {
       predicates.push(`timestamp <= $${values.length}`);
     }
 
+    values.push(filters.limit);
+    const limitPlaceholder = `$${values.length}`;
+    values.push(filters.offset);
+    const offsetPlaceholder = `$${values.length}`;
+
     const result = await this.databaseExecutor.query<AuditLogRow>(
       `
         SELECT
@@ -85,6 +90,8 @@ export class PgAuditLogRepository implements AuditLogRepository {
         FROM audit_logs
         WHERE ${predicates.join("\n          AND ")}
         ORDER BY timestamp DESC, id DESC
+        LIMIT ${limitPlaceholder}
+        OFFSET ${offsetPlaceholder}
       `,
       values,
     );

@@ -48,7 +48,7 @@ describeIfDocker("Audit log endpoints", () => {
     );
 
     const member = await createAccount(httpServer, "member-audit-http@example.com", "Member Audit");
-    await request(httpServer)
+    const membershipResponse = await request(httpServer)
       .post(`/organizations/${organization.organizationId}/memberships`)
       .set("Authorization", `Bearer ${ownerTenantLogin.accessToken}`)
       .send({ userId: member.userId })
@@ -60,13 +60,18 @@ describeIfDocker("Audit log endpoints", () => {
       organization.organizationId,
     );
 
-    await request(httpServer)
+    const deniedResponse = await request(httpServer)
       .get(`/audit-logs?tenantId=${organization.organizationId}`)
       .set("Authorization", `Bearer ${memberTenantLogin.accessToken}`)
       .expect(403);
 
+    expectCorrelatedErrorResponse(deniedResponse, {
+      error: "permission_denied",
+      message: "Permission denied",
+    });
+
     const auditLogsResponse = await request(httpServer)
-      .get(`/audit-logs?tenantId=${organization.organizationId}`)
+      .get(`/audit-logs?tenantId=${organization.organizationId}&limit=10&offset=0`)
       .set("Authorization", `Bearer ${ownerTenantLogin.accessToken}`)
       .expect(200);
 
@@ -89,6 +94,28 @@ describeIfDocker("Audit log endpoints", () => {
       ),
     ).toBe(true);
 
+    const membershipAuditEntry = auditLogsResponse.body.find(
+      (entry: { action: string; metadata: { targetUserId?: string }; correlationId: string }) =>
+        entry.action === "membership_assigned" && entry.metadata.targetUserId === member.userId,
+    );
+
+    expect(membershipAuditEntry).toMatchObject({
+      correlationId: membershipResponse.headers["x-correlation-id"],
+    });
+
+    const firstAuditPage = await request(httpServer)
+      .get(`/audit-logs?tenantId=${organization.organizationId}&limit=1&offset=0`)
+      .set("Authorization", `Bearer ${ownerTenantLogin.accessToken}`)
+      .expect(200);
+    const secondAuditPage = await request(httpServer)
+      .get(`/audit-logs?tenantId=${organization.organizationId}&limit=1&offset=1`)
+      .set("Authorization", `Bearer ${ownerTenantLogin.accessToken}`)
+      .expect(200);
+
+    expect(firstAuditPage.body).toHaveLength(1);
+    expect(secondAuditPage.body).toHaveLength(1);
+    expect(firstAuditPage.body[0].id).not.toBe(secondAuditPage.body[0].id);
+
     await createAccount(httpServer, "other-owner-audit-http@example.com", "Other Owner");
     const otherBootstrap = await login(httpServer, "other-owner-audit-http@example.com", undefined);
     const otherOrganization = await createOrganization(
@@ -101,6 +128,17 @@ describeIfDocker("Audit log endpoints", () => {
       .get(`/audit-logs?tenantId=${otherOrganization.organizationId}`)
       .set("Authorization", `Bearer ${ownerTenantLogin.accessToken}`)
       .expect(403);
+
+    const metricsResponse = await request(httpServer).get("/metrics").expect(200);
+
+    expect(metricsResponse.headers["content-type"]).toContain("text/plain");
+    expect(metricsResponse.text).toContain('nexus_identity_logins_total{result="success"}');
+    expect(metricsResponse.text).toContain('nexus_authorization_decisions_total{result="deny"}');
+    expect(metricsResponse.text).toContain('nexus_audit_operations_total{operation="append"}');
+    expect(metricsResponse.text).toContain('nexus_audit_operations_total{operation="query"}');
+    expect(metricsResponse.text).toContain(
+      'nexus_http_requests_total{method="GET",route="/audit-logs",status_code="200"}',
+    );
   });
 
   it("persists null tenant ids for bootstrap logout and login failure without tenant context", async () => {
@@ -169,6 +207,20 @@ describeIfDocker("Audit log endpoints", () => {
     });
   });
 });
+
+function expectCorrelatedErrorResponse(
+  response: { body: unknown; headers: Record<string, unknown> },
+  expected: { readonly error: string; readonly message: string },
+): void {
+  expect(response.body).toEqual({
+    correlation_id: expect.any(String),
+    error: expected.error,
+    message: expected.message,
+  });
+  expect(response.headers["x-correlation-id"]).toBe(
+    (response.body as { correlation_id: string }).correlation_id,
+  );
+}
 
 async function createAccount(
   httpServer: Parameters<typeof request>[0],

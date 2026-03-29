@@ -34,6 +34,8 @@ describe("ListAuditLogsUseCase", () => {
     const result = await useCase.execute({
       action: "organization_created",
       from: new Date("2026-03-26T00:00:00.000Z"),
+      limit: 20,
+      offset: 10,
       tenantId: "tenant-1",
       to: new Date("2026-03-27T00:00:00.000Z"),
       userId: "user-1",
@@ -42,6 +44,8 @@ describe("ListAuditLogsUseCase", () => {
     expect(repository.list).toHaveBeenCalledWith({
       action: "organization_created",
       from: new Date("2026-03-26T00:00:00.000Z"),
+      limit: 20,
+      offset: 10,
       tenantId: "tenant-1",
       to: new Date("2026-03-27T00:00:00.000Z"),
       userId: "user-1",
@@ -61,6 +65,8 @@ describe("ListAuditLogsUseCase", () => {
     await expect(
       useCase.execute({
         from: new Date("2026-03-27T00:00:00.000Z"),
+        limit: 50,
+        offset: 0,
         tenantId: "tenant-1",
         to: new Date("2026-03-26T00:00:00.000Z"),
       }),

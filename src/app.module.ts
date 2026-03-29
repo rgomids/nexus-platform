@@ -4,6 +4,7 @@ import { AppConfigModule } from "./bootstrap/config/app-config.module";
 import { HealthModule } from "./bootstrap/http/health.module";
 import { LoggingModule } from "./bootstrap/logging/logging.module";
 import { DatabaseModule } from "./bootstrap/persistence/database.module";
+import { TelemetryModule } from "./bootstrap/telemetry/telemetry.module";
 import { AccessControlModule } from "./modules/access-control/access-control.module";
 import { AuditLogsModule } from "./modules/audit-logs/audit-logs.module";
 import { IdentityModule } from "./modules/identity/identity.module";
@@ -16,6 +17,7 @@ import { SecurityModule } from "./shared/security.module";
     AppConfigModule,
     LoggingModule,
     DatabaseModule,
+    TelemetryModule,
     HealthModule,
     SecurityModule,
     IdentityModule,

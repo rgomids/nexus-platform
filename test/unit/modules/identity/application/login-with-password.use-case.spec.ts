@@ -10,6 +10,8 @@ import { OrganizationInactiveError } from "../../../../../src/modules/organizati
 import { MembershipNotFoundError } from "../../../../../src/modules/users/domain/user.errors";
 import { TenantContextRequiredError } from "../../../../../src/shared/tenancy/tenant.errors";
 import {
+  createApplicationMetricsServiceMock,
+  createApplicationTelemetryServiceMock,
   createDatabaseExecutorMock,
   createInternalEventBusMock,
 } from "../../../../support/unit-test-doubles";
@@ -33,6 +35,8 @@ function createConfigService(): ApplicationConfigService {
 
 describe("LoginWithPasswordUseCase", () => {
   it("logs in with valid credentials and an active tenant", async () => {
+    const applicationMetricsService = createApplicationMetricsServiceMock();
+    const applicationTelemetryService = createApplicationTelemetryServiceMock();
     const account = Account.create({
       email: EmailAddress.create("jane@example.com"),
       id: "account-1",
@@ -91,6 +95,8 @@ describe("LoginWithPasswordUseCase", () => {
       createDatabaseExecutorMock(),
       createInternalEventBusMock(),
       createLoggerMock(),
+      applicationTelemetryService,
+      applicationMetricsService,
     );
 
     const result = await useCase.execute({
@@ -103,6 +109,14 @@ describe("LoginWithPasswordUseCase", () => {
     expect(result.accessToken).toBe("jwt-token");
     expect(result.principal.email).toBe("jane@example.com");
     expect(result.principal.organizationId).toBe("organization-1");
+    expect(applicationMetricsService.recordLoginResult).toHaveBeenCalledWith("success");
+    expect(applicationTelemetryService.runInSpan).toHaveBeenCalledWith(
+      "identity.login_with_password",
+      {
+        "identity.has_organization": "true",
+      },
+      expect.any(Function),
+    );
   });
 
   it("allows bootstrap login when the user has no active memberships", async () => {
@@ -165,6 +179,7 @@ describe("LoginWithPasswordUseCase", () => {
   });
 
   it("fails with generic invalid credentials for a bad password", async () => {
+    const applicationMetricsService = createApplicationMetricsServiceMock();
     const account = Account.create({
       email: EmailAddress.create("jane@example.com"),
       id: "account-1",
@@ -207,6 +222,8 @@ describe("LoginWithPasswordUseCase", () => {
       createDatabaseExecutorMock(),
       createInternalEventBusMock(),
       createLoggerMock(),
+      undefined,
+      applicationMetricsService,
     );
 
     await expect(
@@ -215,6 +232,7 @@ describe("LoginWithPasswordUseCase", () => {
         password: "bad-password",
       }),
     ).rejects.toThrow(InvalidCredentialsError);
+    expect(applicationMetricsService.recordLoginResult).toHaveBeenCalledWith("failure");
   });
 
   it("fails when the user is inactive", async () => {

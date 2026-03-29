@@ -1,24 +1,39 @@
 # Commands
 
-## Core Commands
+## Core Scripts
 
 ```bash
 cp .env.example .env
 npm install
 npm run db:migrate
-npm run start:dev
+npm run dev
+npm run docker:up
+npm run docker:logs
+npm run docker:down
 npm run build
 npm run lint
 npm run test
 npm run test:unit
 npm run test:integration
 npm run test:functional
-docker compose up -d --build
-docker compose down -v
-docker compose logs -f app postgres
+npm run ci
 ```
 
-## Phase 4 API Smoke
+## Make Wrappers
+
+```bash
+make up
+make down
+make run
+make test
+make test-unit
+make test-integration
+make test-functional
+make lint
+make ci
+```
+
+## Phase 5 API Smoke
 
 ```bash
 curl -X POST http://localhost:3000/identity/accounts \
@@ -53,17 +68,30 @@ curl -X POST http://localhost:3000/organizations/<organization-id>/memberships \
   -H "Content-Type: application/json" \
   -d '{"userId":"<member-user-id>"}'
 
-curl -X POST http://localhost:3000/users/<member-user-id>/roles \
-  -H "Authorization: Bearer <tenant-token>" \
+curl "http://localhost:3000/organizations/<organization-id>/memberships?limit=50&offset=0" \
+  -H "Authorization: Bearer <tenant-token>"
+
+curl "http://localhost:3000/audit-logs?tenantId=<organization-id>&limit=50&offset=0" \
+  -H "Authorization: Bearer <tenant-token>"
+
+curl "http://localhost:3000/audit-logs?tenantId=<organization-id>&action=authorization_denied&limit=20&offset=0" \
+  -H "Authorization: Bearer <tenant-token>"
+
+curl http://localhost:3000/metrics
+```
+
+## Standardized Error Example
+
+```bash
+curl -X POST http://localhost:3000/identity/login \
   -H "Content-Type: application/json" \
-  -d '{"roleId":"<role-id>"}'
+  -d '{"email":"jane@example.com","password":"short"}'
+```
 
-curl http://localhost:3000/organizations/<organization-id>/memberships \
-  -H "Authorization: Bearer <tenant-token>"
-
-curl "http://localhost:3000/audit-logs?tenantId=<organization-id>" \
-  -H "Authorization: Bearer <tenant-token>"
-
-curl "http://localhost:3000/audit-logs?tenantId=<organization-id>&action=authorization_denied" \
-  -H "Authorization: Bearer <tenant-token>"
+```json
+{
+  "error": "invalid_request",
+  "message": "password must be longer than or equal to 8 characters",
+  "correlation_id": "7ef4e259-31d8-4b91-ae84-0f81f00c84d3"
+}
 ```
